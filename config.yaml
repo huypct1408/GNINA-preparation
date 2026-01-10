@@ -1,0 +1,13 @@
+protein:
+  input_pdb: "input/8skl_protein_raw.pdb"
+  output_pdb: "output/8skl_receptor_prepared_for_gnina.pdb"
+  pH: 7.4
+
+ligands:
+  input_excel: "input/compound_demo.xlsx"
+  smiles_column: "SMILES"
+  id_column: "Cleaned_Name"
+  output_sdf: "output/ligands_for_8skl_prepared.sdf"
+
+embedding:
+  random_seed: 42
