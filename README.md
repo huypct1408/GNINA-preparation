@@ -1,6 +1,6 @@
 # GNINA-preparation
 Protein and Ligand Preparation for GNINA flexible docking
-'''
+```
 open_prep_pipeline/
 ├── config.yaml
 ├── main_pipeline.ipynb
@@ -16,7 +16,8 @@ open_prep_pipeline/
     ├── protein_logic.py
     ├── ligand_logic.py
     └── chemistry.py
-'''
+```
+
 Tổng quan open_prep_pipeline là một quy trình chuẩn bị có tính tái lập và tuân thủ các nguyên tắc hóa học, được thiết kế cho các nghiên cứu docking protein–ligand. Quy trình này chuẩn hóa quá trình proton hóa và sự toàn vẹn cấu trúc của protein, cũng như trạng thái proton hóa, hình học và tô pô (topology) của ligand trước khi tiến hành docking linh hoạt.
 
 **1. Chuẩn bị protein (utils/protein_logic.py): Tạo ra cấu trúc protein hoàn chỉnh về mặt hóa học và được proton hóa, phù hợp cho docking linh hoạt. Việc chuẩn bị protein được thực hiện bằng PDBFixer và OpenMM:**
