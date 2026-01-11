@@ -1,5 +1,6 @@
 # Code này tối ưu hóa của code trên ở chỗ thêm vào task tracking (biết được khi nào chất gì chạy xong (mất bao lâu) và đang làm tới đâu)
 import os
+import re
 import subprocess
 import time
 from rdkit import Chem
@@ -46,11 +47,47 @@ def prepare_root_folders():
 
     os.system(f"cp {PROTEIN_PATH} {RESULTS_DIR}/protein/receptor.pdb")
     os.system(f"cp {REF_LIGAND} {RESULTS_DIR}/reference/ref_ligand.sdf")
+# ==========================================================
+# UTILS
+# ==========================================================
+def sanitize_name(name: str, max_len: int = 80) -> str:
+    """
+    Make a filesystem-safe ligand name.
+
+    Rules:
+    - adds determinism
+    - cross-platform safe (Linux / Mac / Windows)
+    - reviewer-proof
+    """
+    if not name:
+        return "NA"
+
+    # Trim & normalize spaces
+    name = name.strip().replace(" ", "_")
+
+    # Remove illegal filesystem characters
+    name = re.sub(r'[\/:*?"<>|]', '', name)
+
+    # Collapse multiple underscores
+    name = re.sub(r'_+', '_', name)
+
+    return name[:max_len]
 
 # =========================
 # SPLIT LIGANDS (FILESYSTEM ONLY)
 # =========================
-def split_ligands(input_sdf, ligands_root):
+def split_ligands(input_sdf: str, ligands_root: str):
+    """
+    Split multi-ligand SDF into per-ligand folders.
+
+    Guarantees:
+    - ID order == SDF order (top → bottom)
+    - Folder name = LIG_xxxx__OriginalName
+    - META.txt + ligand_mapping.csv for audit trail
+    """
+
+    os.makedirs(ligands_root, exist_ok=True)
+
     suppl = Chem.SDMolSupplier(input_sdf, removeHs=False)
     ligands = []
     mapping = []
@@ -59,35 +96,56 @@ def split_ligands(input_sdf, ligands_root):
         if mol is None:
             continue
 
+        # ----------------------------
+        # Canonical ID (source of truth)
+        # ----------------------------
         lig_id = f"LIG_{idx:04d}"
-        lig_root = os.path.join(ligands_root, lig_id)
-        input_dir = os.path.join(lig_root, "input")
 
+        # Original name from SDF
+        orig_name = mol.GetProp("_Name") if mol.HasProp("_Name") else "NA"
+        safe_name = sanitize_name(orig_name)
+
+        # Final directory name
+        lig_dirname = f"{lig_id}__{safe_name}"
+        lig_root = os.path.join(ligands_root, lig_dirname)
+
+        input_dir = os.path.join(lig_root, "input")
         os.makedirs(input_dir, exist_ok=True)
 
+        # ----------------------------
+        # Write single-ligand SDF
+        # ----------------------------
         ligand_sdf = os.path.join(input_dir, "ligand.sdf")
         writer = Chem.SDWriter(ligand_sdf)
         writer.write(mol)
         writer.close()
 
-        # Metadata
-        orig_name = mol.GetProp("_Name") if mol.HasProp("_Name") else "NA"
+        # ----------------------------
+        # Metadata (canonical record)
+        # ----------------------------
         smiles = Chem.MolToSmiles(mol)
 
         with open(os.path.join(lig_root, "META.txt"), "w") as f:
             f.write(f"ID={lig_id}\n")
+            f.write(f"DIR_NAME={lig_dirname}\n")
             f.write(f"ORIGINAL_NAME={orig_name}\n")
             f.write(f"SMILES={smiles}\n")
             f.write(f"SDF_INDEX={idx}\n")
 
-        ligands.append((lig_id, ligand_sdf))
-        mapping.append((lig_id, orig_name, smiles))
+        ligands.append((lig_dirname, ligand_sdf))
+        mapping.append((lig_id, lig_dirname, orig_name, smiles))
 
-    # Global mapping (very important)
-    with open(os.path.join(ligands_root, "ligand_mapping.csv"), "w") as f:
-        f.write("ID,Original_Name,SMILES\n")
+    # ----------------------------
+    # Global mapping (VERY IMPORTANT)
+    # ----------------------------
+    mapping_file = os.path.join(ligands_root, "ligand_mapping.csv")
+    with open(mapping_file, "w") as f:
+        f.write("ID,DIR_NAME,ORIGINAL_NAME,SMILES\n")
         for row in mapping:
             f.write(",".join(row) + "\n")
+
+    print(f"✔ Split {len(ligands)} ligands")
+    print(f"✔ Mapping written to {mapping_file}")
 
     return ligands
 
