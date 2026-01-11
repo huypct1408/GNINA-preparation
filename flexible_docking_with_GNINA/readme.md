@@ -224,7 +224,10 @@ The default CNN scoring function is an ensemble of 3 models selected to balance 
 Vì các hợp chất mà em chuẩn bị docking là các chất có cấu trúc chung của dẫn chất benzyl ether của 1,3-diarylpyrazol chứa aminoacid. Các hợp chất này sở hữu mức entropy cấu dạng cao trong dung dịch. 
 Để hình thành liên kết, chúng buộc phải trả một "chi phí entropy" (entropic penalty) khổng lồ để cố định (đóng băng) thành một pose cụ thể. Nên đối với task flexible docking trên GNINA, với những hợp chất này
 em sẽ điều chỉnh một số thông số để kết quả docking tốt hơn.
+
 **1. Tăng --exhaustiveness 32 hoặc 64.** Điều này buộc các chuỗi Monte Carlo vận hành lâu hơn gấp 8-16 lần, làm tăng xác suất để bước đi ngẫu nhiên (random walk) thoát khỏi các cực tiểu local của các trạng thái ligand "co cụm".
+
 **2. Sử dụng --cnn refinement thay vì rescore.** Lệnh này sử dụng các gradient của CNN để đẩy các nguyên tử ligand về mặt vật lý vào một tư thế "giống tinh thể" hơn trong bước tối ưu hóa. 
 CNN đã học được tính chất "tương hợp hình dạng" (shape complementarity) từ các cấu trúc tinh thể thực nghiệm và sẽ phạt các cấu dạng co cụm "dạng xoắn" phi thực tế mà Vina có thể ưu tiên.
+
 **3. --autobox_add 8 hoặc 10.** Tăng kích thước hộp lên để ligand có thể chui vừa
