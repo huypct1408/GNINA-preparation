@@ -53,12 +53,13 @@ def prepare_root_folders():
 def split_ligands(input_sdf, ligands_root):
     suppl = Chem.SDMolSupplier(input_sdf, removeHs=False)
     ligands = []
+    mapping = []
 
-    for i, mol in enumerate(suppl):
+    for idx, mol in enumerate(suppl, start=1):
         if mol is None:
             continue
 
-        lig_id = mol.GetProp("_Name") if mol.HasProp("_Name") else f"LIG{i:04d}"
+        lig_id = f"LIG_{idx:04d}"
         lig_root = os.path.join(ligands_root, lig_id)
         input_dir = os.path.join(lig_root, "input")
 
@@ -69,7 +70,24 @@ def split_ligands(input_sdf, ligands_root):
         writer.write(mol)
         writer.close()
 
+        # Metadata
+        orig_name = mol.GetProp("_Name") if mol.HasProp("_Name") else "NA"
+        smiles = Chem.MolToSmiles(mol)
+
+        with open(os.path.join(lig_root, "META.txt"), "w") as f:
+            f.write(f"ID={lig_id}\n")
+            f.write(f"ORIGINAL_NAME={orig_name}\n")
+            f.write(f"SMILES={smiles}\n")
+            f.write(f"SDF_INDEX={idx}\n")
+
         ligands.append((lig_id, ligand_sdf))
+        mapping.append((lig_id, orig_name, smiles))
+
+    # Global mapping (very important)
+    with open(os.path.join(ligands_root, "ligand_mapping.csv"), "w") as f:
+        f.write("ID,Original_Name,SMILES\n")
+        for row in mapping:
+            f.write(",".join(row) + "\n")
 
     return ligands
 
