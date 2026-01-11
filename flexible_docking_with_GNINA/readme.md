@@ -228,6 +228,6 @@ em sẽ điều chỉnh một số thông số để kết quả docking tốt h
 **1. Tăng --exhaustiveness 32 hoặc 64.** Điều này buộc các chuỗi Monte Carlo vận hành lâu hơn gấp 8-16 lần, làm tăng xác suất để bước đi ngẫu nhiên (random walk) thoát khỏi các cực tiểu local của các trạng thái ligand "co cụm".
 
 **2. Sử dụng --cnn refinement thay vì rescore.** Lệnh này sử dụng các gradient của CNN để đẩy các nguyên tử ligand về mặt vật lý vào một tư thế "giống tinh thể" hơn trong bước tối ưu hóa. 
-CNN đã học được tính chất "tương hợp hình dạng" (shape complementarity) từ các cấu trúc tinh thể thực nghiệm và sẽ phạt các cấu dạng co cụm "dạng xoắn" phi thực tế mà Vina có thể ưu tiên.
+CNN đã học được tính chất "tương hợp hình dạng" (shape complementarity) từ các cấu trúc tinh thể thực nghiệm và sẽ phạt các cấu dạng co cụm "dạng xoắn" phi thực tế mà Vina có thể ưu tiên. Tuy nhiên, hiện tại em chỉ đang test code trên **Kaggle** với **GPU P100** của Kaggle nên em chưa để được ``refinement`` mà mới chỉ để ``rescore``. 
 
 **3. --autobox_add 8 hoặc 10.** Tăng kích thước hộp lên để ligand có thể chui vừa
