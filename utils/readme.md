@@ -101,7 +101,7 @@ Trong flexible docking, những sai lệch nhỏ này bị khuếch đại mạn
 
 **4. Thiết kế**
 
-4.1. Chia làm 2 giai đoạn 
+4.1. Chia làm 2 giai đoạn (``chemistry 2(molscrub).py``)
 
 🔹 Giai đoạn 1 — Thermodynamic Fix (MolScrub)
 ``mol = ph_correct_smiles_molscrub(smiles, ph=7.4)``
