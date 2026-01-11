@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import time
+import csv
 from rdkit import Chem
 import socket
 
@@ -14,9 +15,9 @@ RESULTS_DIR = f"{BASE_DIR}/docking_results/8skl"
 
 GNINA_BIN = "/kaggle/working/gnina"
 
-PROTEIN_PATH = "/kaggle/input/docking-profile/8skl_receptor_prepared_for_gnina.pdb"
+PROTEIN_PATH = "/kaggle/input/docking-profile/8skl_receptor_prepared_for_gnina_v2.0.pdb"
 REF_LIGAND   = "/kaggle/input/docking-profile/v2o_ligand_8skl.sdf"
-LIGAND_SDF   = "/kaggle/input/docking-profile/ligands_for_8skl_prepared.sdf"
+LIGAND_SDF   = "/kaggle/input/docking-profile/ligands_for_8skl_prepared_v2.0.sdf"
 
 FLEX_RESIDUES = "A:182,A:181,A:215,A:262,A:49"
 
@@ -139,10 +140,16 @@ def split_ligands(input_sdf: str, ligands_root: str):
     # Global mapping (VERY IMPORTANT)
     # ----------------------------
     mapping_file = os.path.join(ligands_root, "ligand_mapping.csv")
-    with open(mapping_file, "w") as f:
-        f.write("ID,DIR_NAME,ORIGINAL_NAME,SMILES\n")
+    with open(
+        os.path.join(ligands_root, "ligand_mapping.csv"),
+        "w",
+        newline="",
+        encoding="utf-8"
+    ) as f:
+        writer = csv.writer(f)
+        writer.writerow(["ID", "DIR_NAME", "ORIGINAL_NAME", "SMILES"])
         for row in mapping:
-            f.write(",".join(row) + "\n")
+            writer.writerow(row)
 
     print(f"✔ Split {len(ligands)} ligands")
     print(f"✔ Mapping written to {mapping_file}")
