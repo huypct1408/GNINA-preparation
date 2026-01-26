@@ -237,7 +237,29 @@ Theo quan sát của em, em nhận thấy:
 
 + Dễ false positive
 
+**Ngoài ra, với proton hóa của protein: **
+```
+III. The Optimized Workflow (Quy trình tối ưu hóa)
+Để kết hợp code của bạn với việc chỉnh tay một cách an toàn nhất, hãy tuân theo quy trình "Prepare - Inspect - Correct":
+1. Bước 1 (Python Script): Chạy code prepare_protein của bạn để sửa lỗi cấu trúc cơ bản (valence, missing atoms). Đây là bước "làm sạch thô".
+    ◦ Output: protein_prepped.pdb
+2. Bước 2 (Visual Inspection - Bắt buộc): Mở protein_prepped.pdb trong PyMOL hoặc Chimera.
+(Option 2: UCSF Chimera / ChimeraX (Open Source Choice)
+Nếu không có license của Schrödinger, Chimera là lựa chọn thay thế tốt nhất.
+• Quy trình:
+    1. Mở file PDB.
+    2. Vào Tools -> Structure Editing -> Dock Prep.
+    3. Khi hộp thoại "Choose parameter for residue..." hiện ra, Chimera sẽ hỏi bạn cụ thể từng Histidine: bạn muốn gán nó là HID (delta), HIE (epsilon) hay HIP (positive).
+    4. Thao tác thủ công: Bạn có thể chọn cụ thể residue, bấm Actions -> Atoms/Bonds -> delete để xóa hydro sai, và dùng Build Structure để thêm hydro vào vị trí đúng.)
 
+    ◦ Zoom vào vùng Active Site (dựa trên paper gốc).
+    ◦ Kiểm tra các Histidine: Nitơ nào đang chĩa vào kim loại? Nitơ nào đang tạo liên kết hydro?
+    ◦ So sánh với hình ảnh 3D trong bài báo gốc (nếu có).
+3. Bước 3 (Manual Correction):
+    ◦ Nếu phát hiện sai khác: Sử dụng Chimera (chức năng Dock Prep) hoặc Maestro để đảo trạng thái proton/tautomer cho khớp với văn liệu.
+    ◦ Lưu file mới: protein_manual_fixed.pdb.
+4. Bước 4 (Docking): Dùng file protein_manual_fixed.pdb làm input cho quá trình tạo Grid/Box và chạy GNINA.
+```
 
 
   
