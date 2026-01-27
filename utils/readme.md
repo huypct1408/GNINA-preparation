@@ -308,36 +308,7 @@ info :215 atoms
 ```
 
 > *Kết quả mong đợi:* Nhìn danh sách nguyên tử. Bạn **KHÔNG** được thấy nguyên tử tên là `HG` (Hydrogen gắn với Gamma-Sulfur). Nếu thấy `HG` tức là nó vẫn đang hiểu là CYS thường.
-> Nếu có -> delete :215@H* xóa Hydro cũ đi, rồi thực hiện add Hydrogen vô lại, rồi sau đó addcharge
-
----
-
-### Giai đoạn 2: Hóa lý (Chemistry) - QUAN TRỌNG NHẤT
-
-**Bước 3: Tính điện tích**
-Đây là bước quyết định.
-Lệnh thực hiện (Dùng AMBER force field):
-
-```cmd
-addcharge method am1-bcc
-
-```
-
-*(Hoặc chỉ `addcharge` và chọn method trong hộp thoại hiện ra, thường chọn AMBER ff14SB hoặc Gasteiger)*.
-
-Lệnh kiểm tra (Xem điện tích đã "âm" chưa):
-Chúng ta sẽ dán nhãn hiển thị trực tiếp giá trị điện tích lên nguyên tử Sulfur (SG) để soi.
-
-```cmd
-label :215@SG text "{charge:.3f}"
-
-```
-
-> *Kết quả mong đợi:* Trên màn hình, ngay cạnh nguyên tử lưu huỳnh màu vàng, bạn phải thấy con số khoảng **-0.8 đến -1.2**.
-> * Nếu thấy số gần **0.0** hoặc **-0.1**  **SAI**. (Nó đang hiểu là CYS trung hòa).
-> * Nếu thấy số âm lớn  **ĐÚNG** (Nó đã hiểu là ion ).
-> 
-> 
+> Nếu có -> delete :215@H* xóa Hydro cũ đi, rồi thực hiện add Hydrogen vô lại.
 
 ---
 
