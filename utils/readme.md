@@ -286,6 +286,13 @@ info :215 residues
 > *Kết quả mong đợi:* Trong bảng Log, cột Name phải hiện là **CYM**.
 
 **Bước 2: Thêm Hydro (AddH)**
+Bước 1: Mở file từ PDBFixer File này đã có Hydro "tạm chấp nhận được" ở các vị trí không quan trọng.
+Bước 2: Xử lý các Residue đặc biệt (Histidine/Asp/Glu) Với mỗi residue bạn muốn chỉnh (ví dụ His 105):
+1. Xóa sạch Hydro của riêng residue đó:
+2. Lý do: Để residue trở về trạng thái "trần trụi" (chỉ còn heavy atoms), loại bỏ sự áp đặt của PDBFixer.
+3. Đổi tên (Set State):
+4. Thêm lại Hydro (Re-protonate):
+5. Lúc này ChimeraX chỉ nhìn thấy heavy atoms và tên HID → Nó sẽ gắn duy nhất 1 Hydro vào vị trí Delta. Các residue khác xung quanh đã có Hydro từ PDBFixer nên sẽ không bị ảnh hưởng.
 Lệnh thực hiện:
 
 ```cmd
