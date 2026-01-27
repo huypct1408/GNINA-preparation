@@ -260,6 +260,143 @@ Nếu không có license của Schrödinger, Chimera là lựa chọn thay thế
     ◦ Lưu file mới: protein_manual_fixed.pdb.
 4. Bước 4 (Docking): Dùng file protein_manual_fixed.pdb làm input cho quá trình tạo Grid/Box và chạy GNINA.
 ```
+**Các bước cần thực hiện**
+```
+Dưới đây là bộ lệnh (cmd) từng bước cụ thể để bạn thực hiện quy trình "Hack" này trên ChimeraX, kèm theo các lệnh **Kiểm tra (Verify)** để đảm bảo bạn không bị sai ở giữa đường.
+
+Chúng ta sẽ lấy ví dụ chuyển **Residue 215** từ **CYS** sang **CYM** (Cysteine khử hydro, mang điện tích âm).
+
+### Giai đoạn 1: Chuẩn bị hình học (Geometry)
+
+**Bước 1: Đổi tên để định hướng việc gắn Hydro**
+Lệnh thực hiện:
+
+```cmd
+setattr :215 residues name CYM
+
+```
+
+Lệnh kiểm tra (Xem tên đã đổi chưa):
+
+```cmd
+info :215 residues
+
+```
+
+> *Kết quả mong đợi:* Trong bảng Log, cột Name phải hiện là **CYM**.
+
+**Bước 2: Thêm Hydro (AddH)**
+Lệnh thực hiện:
+
+```cmd
+addh
+
+```
+
+Lệnh kiểm tra (Xem có bị dư Hydro không):
+
+```cmd
+info :215 atoms
+
+```
+
+> *Kết quả mong đợi:* Nhìn danh sách nguyên tử. Bạn **KHÔNG** được thấy nguyên tử tên là `HG` (Hydrogen gắn với Gamma-Sulfur). Nếu thấy `HG` tức là nó vẫn đang hiểu là CYS thường.
+
+---
+
+### Giai đoạn 2: Hóa lý (Chemistry) - QUAN TRỌNG NHẤT
+
+**Bước 3: Tính điện tích**
+Đây là bước quyết định.
+Lệnh thực hiện (Dùng AMBER force field):
+
+```cmd
+addcharge method am1-bcc
+
+```
+
+*(Hoặc chỉ `addcharge` và chọn method trong hộp thoại hiện ra, thường chọn AMBER ff14SB hoặc Gasteiger)*.
+
+Lệnh kiểm tra (Xem điện tích đã "âm" chưa):
+Chúng ta sẽ dán nhãn hiển thị trực tiếp giá trị điện tích lên nguyên tử Sulfur (SG) để soi.
+
+```cmd
+label :215@SG text "{charge:.3f}"
+
+```
+
+> *Kết quả mong đợi:* Trên màn hình, ngay cạnh nguyên tử lưu huỳnh màu vàng, bạn phải thấy con số khoảng **-0.8 đến -1.2**.
+> * Nếu thấy số gần **0.0** hoặc **-0.1**  **SAI**. (Nó đang hiểu là CYS trung hòa).
+> * Nếu thấy số âm lớn  **ĐÚNG** (Nó đã hiểu là ion ).
+> 
+> 
+
+---
+
+### Giai đoạn 3: Ngụy trang (Compatibility)
+
+**Bước 4: Trả lại tên chuẩn cho phần mềm khác đọc**
+Lệnh thực hiện:
+
+```cmd
+setattr :215 residues name CYS
+
+```
+
+**Bước 5: Kiểm tra toàn diện lần cuối (Final Check)**
+Bạn cần đảm bảo: Tên là CYS (để không lỗi phần mềm khác) NHƯNG điện tích vẫn là của CYM.
+
+Lệnh kiểm tra 1 (Tên):
+
+```cmd
+info :215 residues
+
+```
+
+> *Mong đợi:* Tên là **CYS**.
+
+Lệnh kiểm tra 2 (Điện tích - quan trọng nhất):
+
+```cmd
+info :215@SG attribute charge
+
+```
+
+> *Mong đợi:* Giá trị **VẪN PHẢI LÀ số âm lớn** (như bước 3). Nếu nó nhảy về 0 tức là bạn đã làm sai thứ tự (hoặc phần mềm tự reset).
+
+Lệnh kiểm tra 3 (Hình học):
+
+```cmd
+info :215 atoms
+
+```
+
+> *Mong đợi:* Vẫn **không thấy** nguyên tử `HG`.
+
+---
+
+### Tóm tắt các lệnh Kiểm Tra nhanh (Cheat Sheet)
+
+Nếu bạn muốn kiểm tra nhanh bất cứ lúc nào, hãy dùng dòng lệnh này để hiển thị Tên Residue + Tên Nguyên Tử + Điện tích ngay trên màn hình 3D:
+
+```cmd
+label :215 atoms text "Res: {mid}| Atom: {name}| Q: {charge:.3f}"
+
+```
+
+* **Nếu đúng (CYM núp bóng CYS):**
+* Res: CYS
+* Atom: SG
+* Q: -1.xxxx
+* (Không có Atom HG)
+
+
+* **Nếu sai (CYS thường):**
+* Res: CYS
+* Atom: SG
+* Q: -0.xxxx (rất nhỏ)
+* (Có Atom HG hiện diện)
+```
 
 
   
