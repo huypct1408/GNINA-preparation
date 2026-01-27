@@ -288,7 +288,7 @@ info :215 residues
 **Bước 2: Thêm Hydro (AddH)**
 Bước 1: Mở file từ PDBFixer File này đã có Hydro "tạm chấp nhận được" ở các vị trí không quan trọng.
 Bước 2: Xử lý các Residue đặc biệt (Histidine/Asp/Glu) Với mỗi residue bạn muốn chỉnh (ví dụ His 105):
-1. Xóa sạch Hydro của riêng residue đó:
+1. Xóa sạch Hydro của riêng residue đó: delete :215@H* :181@H*
 2. Lý do: Để residue trở về trạng thái "trần trụi" (chỉ còn heavy atoms), loại bỏ sự áp đặt của PDBFixer.
 3. Đổi tên (Set State):
 4. Thêm lại Hydro (Re-protonate):
