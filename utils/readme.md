@@ -376,6 +376,9 @@ label :215 atoms text "Res: {mid}| Atom: {name}| Q: {charge:.3f}"
 * Q: -0.xxxx (rất nhỏ)
 * (Có Atom HG hiện diện)
 ```
+Câu lệnh tìm flexres
+Flexible Docking thành công phải minh chứng được sự "Induced Fit" (khớp cảm ứng), trong đó các residue linh động mở đường cho ligand chui sâu vào túi hoạt động.
+vậy tôi sẽ bắt buộc (mandatory) chỉ định flexres với các residue nào của protein......
 
 
   
