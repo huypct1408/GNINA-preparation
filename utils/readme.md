@@ -301,6 +301,7 @@ info :215 atoms
 ```
 
 > *Kết quả mong đợi:* Nhìn danh sách nguyên tử. Bạn **KHÔNG** được thấy nguyên tử tên là `HG` (Hydrogen gắn với Gamma-Sulfur). Nếu thấy `HG` tức là nó vẫn đang hiểu là CYS thường.
+> Nếu có -> delete :215@H* xóa Hydro cũ đi, rồi thực hiện add Hydrogen vô lại, rồi sau đó addcharge
 
 ---
 
@@ -371,7 +372,7 @@ info :215 atoms
 
 ```
 
-> *Mong đợi:* Vẫn **không thấy** nguyên tử `HG`.
+> *Mong đợi:* Vẫn **không thấy** nguyên tử `HG`. -
 
 ---
 
