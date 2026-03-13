@@ -65,7 +65,30 @@ pip:
 > **Key fixes:** Removed impossible version pins, fixed channel prefixes, added `python-dotenv` for `.env` loading, used `glog` (correct conda-forge package name, not `libgoogle-glog`).
 
 ---
+```
+D:\test_new_venv\
+│
+├── flexible_docking_execution.py    ← The script
+├── .env                             ← ✅ RIGHT HERE, next to the script
+│
+├── data\
+│   ├── mmp2_7xjo_ready_for_gnina.pdb
+│   ├── ref_ligand.sdf
+│   └── ligands_prepared.sdf
+│
+├── docking_results\                 ← Auto-created when you run
+│   └── 8skl\
+│
+└── .vscode\                         ← VS Code config (optional)
+    ├── settings.json
+    └── launch.json
 
+
+Somewhere else (doesn't matter where):
+───────────────────────────────────────
+C:\Users\hi5600971\Downloads\
+    └── environment_gnina_v132_final.yml   ← Only used ONCE
+```
 ## File 2: .env Configuration (Corrected)
 
 ```bash
