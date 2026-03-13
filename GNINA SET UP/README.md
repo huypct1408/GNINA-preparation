@@ -59,14 +59,14 @@ conda info --envs
 
 ### **Step 1.2: Save Environment File**
 
-Create file: `environment_gnina_v132_validated_final.yml`
+Create file: `gnina_environment.yml`
 
-```yaml name=environment_gnina_v132_validated_final.yml
+```yaml name=gnina_environment.yml
 # GNINA v1.3.2 Production Environment
 # Validated against primary sources: GNINA repo, CMakeLists.txt, Docker builds,
 # Production validation: Exscientia plif_validity, ProLIF-paper, 50+ publications
 
-name: gnina_dock_v2_final
+name: gnina_env
 channels:
   - conda-forge
   - pytorch
@@ -137,7 +137,7 @@ pip:
 
 ```bash
 # Navigate to directory containing the YAML file
-cd /path/to/your/project/
+cd /path/to/your/project/ #Tạo thư mục trước rồi lấy path sau
 
 # Create environment from YAML
 conda env create -f gnina_environment.yml
