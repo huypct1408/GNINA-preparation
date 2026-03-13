@@ -124,9 +124,6 @@ LIGAND_SDF=D:/test_new_venv/data/ligands_prepared.sdf
 
 # GPU
 CUDA_VISIBLE_DEVICES=0
-
-# GPU
-CUDA_VISIBLE_DEVICES=0
 ```
 
 > **Key fix:** Absolute paths only (no `$HOME`), python-dotenv handles loading.
