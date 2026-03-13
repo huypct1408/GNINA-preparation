@@ -76,7 +76,7 @@ pip:
 # Uncomment ONE of these based on your system:
 
 # Linux local install:
-GNINA_BIN=/home/hi5600971/.local/bin/gnina
+#GNINA_BIN=/home/hi5600971/.local/bin/gnina
 
 # macOS:
 # GNINA_BIN=/usr/local/bin/gnina
@@ -85,10 +85,22 @@ GNINA_BIN=/home/hi5600971/.local/bin/gnina
 # GNINA_BIN=/kaggle/working/gnina
 
 # Project paths (relative to project root)
-DOCKING_BASE_DIR=./docking_workspace
-PROTEIN_PATH=./data/protein_8skl_protonated_chimera.pdb
-REF_LIGAND=./data/v2o_ligand_8skl.sdf
-LIGAND_SDF=./data/ligands_for_8skl_prepared_v2.0.sdf
+# .env — YOUR custom configuration
+# Rules: No spaces around =, use forward slashes, quote paths with spaces
+
+# GNINA binary
+GNINA_BIN=D:/test_new_venv/bin/gnina.exe
+
+# Base working directory
+DOCKING_BASE_DIR=D:/test_new_venv
+
+# Input files — USE FORWARD SLASHES even on Windows
+PROTEIN_PATH=D:/code python/open_protein_ligand_prep_pipeline(v2.0)/output/(READY) mmp2_7xjo_ready_for_gnina.pdb
+REF_LIGAND=D:/test_new_venv/data/ref_ligand.sdf
+LIGAND_SDF=D:/test_new_venv/data/ligands_prepared.sdf
+
+# GPU
+CUDA_VISIBLE_DEVICES=0
 
 # GPU
 CUDA_VISIBLE_DEVICES=0
