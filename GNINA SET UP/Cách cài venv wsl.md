@@ -1,5 +1,15 @@
 ## Lựa chọn A: Làm mọi thứ trong WSL (qua VS Code, vẫn dùng GUI Windows)
+```
+Bước 1:  VS Code → F1 → "WSL: Connect to WSL"        ← Chuyển sang WSL TRƯỚC
+Bước 2:  Tạo thư mục trong WSL terminal               ← mkdir ~/gnina_project
+Bước 3:  Cài conda trong WSL                           ← Miniconda Linux
+Bước 4:  Tạo conda env trong WSL                       ← conda env create -f ...
+Bước 5:  Cài gnina trong WSL                            ← wget gnina Linux binary
+Bước 6:  Copy data từ Windows vào WSL                  ← cp /mnt/d/... ~/gnina_project/
+Bước 7:  Chạy notebook trong WSL                       ← Kernel = gnina_env (WSL)
 
+         Tất cả trong 1 thế giới → Mọi thứ thấy nhau → Chạy được
+```
 > Bạn vẫn dùng VS Code trên Windows bình thường, chỉ là "connect" vào WSL
 
 ### Bước 1: Kiểm tra máy đã có gì
