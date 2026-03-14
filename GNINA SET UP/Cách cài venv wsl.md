@@ -1,4 +1,5 @@
 ## Lựa chọn A: Làm mọi thứ trong WSL (qua VS Code, vẫn dùng GUI Windows)
+
 ```
 Bước 1:  VS Code → F1 → "WSL: Connect to WSL"        ← Chuyển sang WSL TRƯỚC
 Bước 2:  Tạo thư mục trong WSL terminal               ← mkdir ~/gnina_project
@@ -12,31 +13,40 @@ Bước 7:  Chạy notebook trong WSL                       ← Kernel = gnina_e
 ```
 > Bạn vẫn dùng VS Code trên Windows bình thường, chỉ là "connect" vào WSL
 
+---
+
 ### Bước 1: Kiểm tra máy đã có gì
 
-Mở **PowerShell** trên Windows:
+**🖱️ GUI trước:**
+- Nhấn `Win` → gõ **"PowerShell"** → mở lên
+- Nhấn `Win` → gõ **"Ubuntu"** (hoặc tên distro WSL của bạn) → mở terminal WSL lên
 
+**⌨️ Rồi gõ lệnh kiểm tra:**
+
+Trong **PowerShell**:
 ```powershell
-# Kiểm tra WSL
-wsl --list --verbose
-
-# Kiểm tra conda trên WINDOWS (cái bạn đã có)
-conda --version
+wsl --list --verbose       # Xem WSL đang chạy gì
+conda --version            # Kiểm tra conda trên WINDOWS
 ```
 
-Mở **WSL terminal** (gõ `wsl` trong PowerShell):
-
+Trong **WSL terminal**:
 ```bash
-# Kiểm tra conda trong WSL
 conda --version
-# Nếu "command not found" → cần cài conda trong WSL (Bước 2)
-# Nếu có version → skip Bước 2
+# "command not found" → cần cài (Bước 2)
+# Có version rồi → bỏ qua Bước 2
 ```
+
+---
 
 ### Bước 2: Cài Miniconda trong WSL (nếu chưa có)
 
+**🖱️ GUI trước:**
+- Mở trình duyệt → vào `https://docs.conda.io/en/latest/miniconda.html`
+- Tìm file **Miniconda3 Linux 64-bit** → xem tên file (ví dụ `Miniconda3-latest-Linux-x86_64.sh`)
+- *(Không cần tải tay — chỉ để biết tên file đúng)*
+
+**⌨️ Rồi chạy trong WSL terminal:**
 ```bash
-# Trong WSL terminal
 mkdir -p ~/miniconda3
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
   -O ~/miniconda3/miniconda.sh
@@ -49,34 +59,46 @@ conda --version
 
 > **Conda trong WSL hoàn toàn tách biệt với conda trên Windows.** Cài thêm không ảnh hưởng gì.
 
-### Bước 3: Tạo project folder (trong WSL, nhưng thao tác qua VS Code)
+---
 
+### Bước 3: Tạo project folder
+
+**🖱️ GUI trước:**
+- Mở **File Explorer** → điều hướng vào `\\wsl$\Ubuntu\home\<tên_user>\`
+- Nhìn xem đã có folder `gnina_project` chưa → nếu chưa có thì dùng lệnh dưới
+
+**⌨️ Tạo bằng lệnh trong WSL terminal:**
 ```bash
-# Trong WSL terminal
 mkdir -p ~/gnina_project/data
 mkdir -p ~/gnina_project/bin
 cd ~/gnina_project
 ```
 
+---
+
 ### Bước 4: Mở project trong VS Code
 
+**🖱️ GUI — làm hết bằng chuột:**
 ```
-VS Code trên Windows:
-  F1 → "WSL: Connect to WSL" → chọn Ubuntu
-  File → Open Folder → gõ: /home/<tên_user>/gnina_project
-  Enter
-  
-  Góc trái dưới phải hiện: "WSL: Ubuntu"
+1. Mở VS Code trên Windows bình thường
+2. Nhấn F1 (hoặc Ctrl+Shift+P) → gõ "WSL: Connect to WSL" → Enter
+3. Góc trái dưới VS Code chuyển thành: "WSL: Ubuntu"  ← xác nhận đã vào WSL
+4. File → Open Folder → gõ vào ô đường dẫn: /home/<tên_user>/gnina_project → OK
 ```
 
-Từ giờ, **Terminal trong VS Code = WSL terminal**. Bạn gõ lệnh Linux bình thường.
+> Từ giờ, **Terminal trong VS Code = WSL terminal**. Bạn gõ lệnh Linux bình thường.
+
+---
 
 ### Bước 5: Tạo conda env
 
-Trong VS Code Terminal (đã là WSL):
+**🖱️ GUI trước:**
+- Trong VS Code (đang WSL) → nhấn **Ctrl+`` ` ``** để mở Terminal tích hợp
+- Terminal hiện ra ở dưới cùng → đây đã là WSL rồi, không cần mở thêm cửa sổ khác
 
+**⌨️ Rồi chạy trong Terminal đó:**
 ```bash
-# Tạo file YAML
+# Tạo file YAML (copy-paste nguyên khối này)
 cat > environment_gnina.yml << 'EOF'
 name: gnina_env
 channels:
@@ -105,28 +127,43 @@ dependencies:
     - psutil>=5.8.0
 EOF
 
-# Tạo env (10-20 phút lần đầu)
-conda env create -f environment_gnina.yml
+conda env create -f environment_gnina.yml    # ← 10-20 phút lần đầu, bình thường
 conda activate gnina_env
 
-# Đăng ký Jupyter kernel
 python -m ipykernel install --user --name gnina_env --display-name "GNINA Env"
 
-# Verify
 python -c "from rdkit import Chem; print('✅ RDKit OK')"
 ```
 
+---
+
 ### Bước 6: Cài GNINA binary
 
+**🖱️ GUI trước:**
+- Mở trình duyệt → vào `https://github.com/gnina/gnina/releases`
+- Tìm release **v1.3.2** → xem tên file binary Linux (dạng `gnina.1.3.2`, không có `.exe`)
+- *(Không cần tải tay — chỉ để xác nhận link đúng)*
+
+**⌨️ Rồi tải thẳng trong WSL terminal:** 
+Dùng `https://github.com/gnina/gnina/releases/download/v1.3.2/gnina.1.3.2` hoặc `https://github.com/gnina/gnina/releases/download/v1.3.2/gnina.1.3.2.cuda12.8`
 ```bash
 wget -q https://github.com/gnina/gnina/releases/download/v1.3.2/gnina.1.3.2 \
   -O ~/gnina_project/bin/gnina
 chmod +x ~/gnina_project/bin/gnina
-~/gnina_project/bin/gnina --version
+~/gnina_project/bin/gnina --version          # ← hiện version = thành công
 ```
+
+---
 
 ### Bước 7: Copy data từ Windows vào WSL
 
+**🖱️ GUI trước:**
+- Mở **File Explorer** → vào thư mục chứa data trên Windows (ví dụ `D:\test_new_venv\data\`)
+- Kiểm tra tên file chính xác: `ref_ligand.sdf`, `ligands_prepared.sdf`, `.pdb` — **đừng đánh tay, dễ sai**
+- Mở thêm tab File Explorer thứ 2 → vào `\\wsl$\Ubuntu\home\<tên_user>\gnina_project\data\`
+- Kéo thả file từ tab Windows sang tab WSL nếu muốn hoàn toàn không dùng lệnh
+
+**⌨️ Hoặc dùng lệnh trong WSL terminal (nhanh hơn):**
 ```bash
 # Trong WSL, ổ D: Windows = /mnt/d/
 cp "/mnt/d/code python/open_protein_ligand_prep_pipeline(v2.0)/output/(READY) mmp2_7xjo_ready_for_gnina.pdb" \
@@ -138,12 +175,18 @@ cp /mnt/d/test_new_venv/data/ref_ligand.sdf \
 cp /mnt/d/test_new_venv/data/ligands_prepared.sdf \
    ~/gnina_project/data/
 
-# Verify
-ls -la ~/gnina_project/data/
+ls -la ~/gnina_project/data/     # ← xác nhận 3 file đã vào
 ```
 
-### Bước 8: Tạo .env
+---
 
+### Bước 8: Tạo file .env
+
+**🖱️ GUI trước:**
+- Trong VS Code (đang WSL) → **Explorer panel bên trái** → chuột phải vào thư mục `gnina_project` → **New File** → đặt tên `.env`
+- File `.env` trắng xuất hiện → paste nội dung dưới vào rồi **Ctrl+S** lưu
+
+**⌨️ Hoặc tạo thẳng bằng lệnh:**
 ```bash
 cat > ~/gnina_project/.env << EOF
 GNINA_BIN=$HOME/gnina_project/bin/gnina
@@ -154,18 +197,23 @@ LIGAND_SDF=$HOME/gnina_project/data/ligands_prepared.sdf
 CUDA_VISIBLE_DEVICES=0
 EOF
 
-cat .env
+cat .env     # ← xác nhận nội dung đúng
 ```
+
+---
 
 ### Bước 9: Tạo notebook và chạy
 
+**🖱️ GUI — làm hết bằng chuột:**
 ```
-Trong VS Code (đang connect WSL):
-  1. File → New File → docking_pipeline.ipynb
-  2. Paste code .ipynb (1 cell) vào
-  3. Góc phải trên → Select Kernel → "GNINA Env"
-  4. Shift+Enter → Chạy!
+1. VS Code (đang WSL) → File → New File → đặt tên: docking_pipeline.ipynb
+2. Paste code notebook vào cell đầu tiên
+3. Góc phải trên → "Select Kernel" → chọn "GNINA Env"
+4. Shift+Enter → Chạy!
 ```
+
+---
+
 **Architecture**
 ```
 ~/gnina_project/                  ← MỞ FOLDER NÀY TRONG VS CODE (qua WSL: Connect)
@@ -177,12 +225,11 @@ Trong VS Code (đang connect WSL):
 │
 ├── bin/
 │   └── gnina                     ← GNINA binary LINUX (không có .exe)
-│                                    (download từ GitHub, chmod +x)
 │
 ├── data/
-│   ├── mmp2_7xjo_ready_for_gnina.pdb   ← Copy từ /mnt/d/... vào đây
-│   ├── ref_ligand.sdf                   ← Copy từ /mnt/d/... vào đây
-│   └── ligands_prepared.sdf             ← Copy từ /mnt/d/... vào đây
+│   ├── mmp2_7xjo_ready_for_gnina.pdb
+│   ├── ref_ligand.sdf
+│   └── ligands_prepared.sdf
 │
 └── docking_results/              ← Tự tạo khi chạy notebook
     └── .../
