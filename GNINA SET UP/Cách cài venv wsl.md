@@ -156,4 +156,24 @@ Trong VS Code (đang connect WSL):
   3. Góc phải trên → Select Kernel → "GNINA Env"
   4. Shift+Enter → Chạy!
 ```
-
+**Architecture**
+```
+~/gnina_project/                  ← MỞ FOLDER NÀY TRONG VS CODE (qua WSL: Connect)
+│                                    Góc trái dưới VS Code hiện: "WSL: Ubuntu"
+│
+├── .env                          ← Config paths (dùng Linux paths: /home/...)
+├── environment_gnina.yml         ← Dùng 1 lần tạo conda env
+├── docking_pipeline.ipynb        ← ▶️ CHẠY FILE NÀY (Kernel: "GNINA Env")
+│
+├── bin/
+│   └── gnina                     ← GNINA binary LINUX (không có .exe)
+│                                    (download từ GitHub, chmod +x)
+│
+├── data/
+│   ├── mmp2_7xjo_ready_for_gnina.pdb   ← Copy từ /mnt/d/... vào đây
+│   ├── ref_ligand.sdf                   ← Copy từ /mnt/d/... vào đây
+│   └── ligands_prepared.sdf             ← Copy từ /mnt/d/... vào đây
+│
+└── docking_results/              ← Tự tạo khi chạy notebook
+    └── .../
+```
