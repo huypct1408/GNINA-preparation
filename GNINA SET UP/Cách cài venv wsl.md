@@ -125,13 +125,22 @@ dependencies:
 ---
 
 ### Bước 5: Tạo conda env
-🖱️ Cách nhanh nhất — không cần gõ đường dẫn:
+## Quy trình đúng:
+
+**🖱️ Cách nhanh nhất — không cần gõ đường dẫn:**
+```
 Trong VS Code, cột Explorer bên trái
 → Chuột phải vào thư mục gnina_project
 → Chọn "Open in Integrated Terminal"
 → Terminal mở ra, tự động đứng sẵn ở ~/gnina_project/ luôn
-⌨️ Hoặc cd thủ công trong terminal:
-bashcd ~/gnina_project         # ← vào đúng thư mục trước
+```
+
+**⌨️ Hoặc cd thủ công trong terminal:**
+```bash
+cd ~/gnina_project         # ← vào đúng thư mục trước
+```
+
+**Sau đó paste bình thường:**
 > ⚠️ Bước này bắt buộc dùng lệnh — conda cài packages tự động, không có GUI thay thế
 
 **🖱️ GUI mở terminal:**
