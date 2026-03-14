@@ -201,9 +201,10 @@ python -c "from rdkit import Chem; print('✅ RDKit OK')"
 
 **⌨️ Paste vào terminal VS Code:**
 ```bash
-wget -q https://github.com/gnina/gnina/releases/download/v1.3.2/gnina.1.3.2.cuda12.8 \
-  -O ~/gnina_project/bin/gnina
+wget -q https://github.com/gnina/gnina/releases/download/v1.3.2/gnina.1.3.2.cuda12.8 -O ~/gnina_project/bin/gnina
+
 chmod +x ~/gnina_project/bin/gnina
+
 ~/gnina_project/bin/gnina --version     # ← hiện version = thành công
 ```
 
