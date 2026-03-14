@@ -64,7 +64,7 @@ conda --version
 ### Bước 3: Tạo project folder
 
 **🖱️ GUI trước:**
-- Mở **File Explorer** → điều hướng vào `\\wsl$\Ubuntu\home\<tên_user>\`
+- Mở **File Explorer** (Trên my computer) → điều hướng vào `\\wsl$\Ubuntu\home\<tên_user>\`
 - Nhìn xem đã có folder `gnina_project` chưa → nếu chưa có thì dùng lệnh dưới
 
 **⌨️ Tạo bằng lệnh trong WSL terminal:**
