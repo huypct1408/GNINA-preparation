@@ -183,7 +183,7 @@ ls -la ~/gnina_project/data/     # ← xác nhận 3 file đã vào
 ### Bước 8: Tạo file .env
 
 **🖱️ GUI trước:**
-- Trong VS Code (đang WSL) → **Explorer panel bên trái** → chuột phải vào thư mục `gnina_project` → **New File** → đặt tên `.env`
+- Trong VS Code (đang WSL) → **Explorer panel bên trái** (VS Code Explorer (Ctrl+Shift+E)) → chuột phải vào thư mục `gnina_project` → **New File** → đặt tên `.env`
 - File `.env` trắng xuất hiện → paste nội dung dưới vào rồi **Ctrl+S** lưu
 
 **⌨️ Hoặc tạo thẳng bằng lệnh:**
