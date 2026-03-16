@@ -1,8 +1,21 @@
-```
+
+
+# Code Review & Redesign — GNINA Flexible Docking Pipeline v2.5 → v2.6
+
+## Phân tích vấn đề của code gốc
+
+Code gốc sắp xếp và trình bày kết quả **hoàn toàn dựa trên `minimizedAffinity`** — điều này mâu thuẫn trực tiếp với kiến trúc phân xử (arbitration protocol) mà bạn yêu cầu:
+
+| Yêu cầu kiến trúc | Code gốc | Cần sửa |
+|---|---|---|
+| Intra-ligand: chọn pose theo **CNNscore** | ✅ GNINA đã sort theo CNNscore | ❌ Nhưng `parse_top_scores` lại re-sort theo `minimizedAffinity` → phá vỡ thứ tự |
+| Inter-ligand: xếp hạng theo **CNN_VS** | ❌ Xếp hạng theo `minimizedAffinity` | Cần thay đổi |
+| Sanity check: cờ đỏ khi CNN_VS cao + affinity kém | ❌ Không có | Cần thêm |
+| Excel sheets phản ánh 3 tầng phân xử | ❌ Chỉ có 1 logic sort | Cần redesign |
 
 ---
 
-## Tóm tắt những gì thay đổi
+## Tóm tắt những gì thay đổi so với v2.5
 
 ### Không thay đổi (100% giữ nguyên):
 | Component | Status |
