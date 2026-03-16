@@ -5,6 +5,7 @@
 #   1. PATH lấy từ .env thay vì hardcode
 #   2. Đảm bảo LD_LIBRARY_PATH cho conda env
 #   3. subprocess env đảm bảo gnina tìm được thư viện
+#   4. Fix warning "tagged 2D" trong split_ligands
 #   TOÀN BỘ LOGIC DOCKING + SCORING + EXCEL GIỮ NGUYÊN 100%
 # ============================================================
 
@@ -67,7 +68,7 @@ REF_LIGAND = _resolve_path("REF_LIGAND", f"{BASE_DIR}/data/ref_ligand.sdf")
 LIGAND_SDF = _resolve_path("LIGAND_SDF", f"{BASE_DIR}/data/ligands_prepared.sdf")
 FLEX_RESIDUES = "A:182,A:181,A:215,A:262,A:49"
 SEED = "42"
-GPU_DEVICE = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
+GPU_DEVICE = os.environ.get("GNINA_GPU_DEVICE", "0")
 
 # GNINA_BIN — [MỚI] auto-detect
 _env_bin = os.environ.get("GNINA_BIN", "")
@@ -204,13 +205,25 @@ def prepare_root_folders():
 
 
 # =========================
-# SPLIT LIGANDS — 100% giữ nguyên code gốc
+# SPLIT LIGANDS — FIX warning "tagged 2D" + line endings
 # =========================
 def split_ligands(input_sdf: str, ligands_root: str) -> list:
-    """Split multi-ligand SDF into per-ligand folders."""
+    """Split multi-ligand SDF into per-ligand folders.
+    Fix: normalize \\r\\n → \\n trước khi parse để tránh 'tagged 2D' warning.
+    """
     os.makedirs(ligands_root, exist_ok=True)
 
-    suppl = Chem.SDMolSupplier(input_sdf, removeHs=False)
+    # ── FIX: Normalize line endings (\r\n → \n, lone \r → \n) ──
+    cleaned_sdf = os.path.join(ligands_root, "_cleaned_input.sdf")
+    with open(input_sdf, "rb") as f_in:
+        raw = f_in.read()
+    raw = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    with open(cleaned_sdf, "wb") as f_out:
+        f_out.write(raw)
+    print(f"🔧 Normalized line endings → {cleaned_sdf}")
+
+    # ── Parse cleaned SDF ──
+    suppl = Chem.SDMolSupplier(cleaned_sdf, removeHs=False, sanitize=True)
     ligands = []
     mapping = []
 
@@ -218,6 +231,17 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
         if mol is None:
             print(f"⚠️ Skipping invalid molecule at index {idx}")
             continue
+
+        # ── FIX: Force 3D tag nếu có tọa độ Z ≠ 0 ──
+        conf = mol.GetConformer() if mol.GetNumConformers() > 0 else None
+        if conf is not None:
+            has_z = any(
+                abs(conf.GetAtomPosition(i).z) > 0.001
+                for i in range(mol.GetNumAtoms())
+            )
+            if has_z and not conf.Is3D():
+                conf.Set3D(True)
+                print(f"🔧 LIG_{idx:04d}: forced 3D tag (had Z coordinates)")
 
         lig_id = f"LIG_{idx:04d}"
         orig_name = mol.GetProp("_Name") if mol.HasProp("_Name") else "NA"
@@ -229,7 +253,10 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
         os.makedirs(input_dir, exist_ok=True)
 
         ligand_sdf = os.path.join(input_dir, "ligand.sdf")
+
+        # ── FIX: Write with forceV3000=False để giữ V2000 format chuẩn ──
         writer = Chem.SDWriter(ligand_sdf)
+        writer.SetForceV3000(False)
         writer.write(mol)
         writer.close()
 
@@ -376,7 +403,7 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
         "--cnn_scoring",
         "rescore",
         "--cnn_empirical_weight",
-        "2.0",
+        "1.0",
         "--pose_sort_order",
         "CNNscore",
         "--device",
