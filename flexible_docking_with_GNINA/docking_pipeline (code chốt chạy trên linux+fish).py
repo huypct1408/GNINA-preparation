@@ -1,18 +1,12 @@
 # ============================================================
-# 🧬 GNINA Flexible Docking Pipeline v2.6 — Linux + Fish Shell
+# 🧬 GNINA Flexible Docking Pipeline v2.6.2 — Linux + Fish Shell
 # ============================================================
-# Thay đổi so với v2.5:
-#   1. PATH lấy từ .env thay vì hardcode
-#   2. Đảm bảo LD_LIBRARY_PATH cho conda env
-#   3. subprocess env đảm bảo gnina tìm được thư viện
-#   4. Fix warning "tagged 2D" trong split_ligands
-#   5. [v2.6] Excel output tuân theo Arbitration Protocol:
-#      - Intra-ligand: giữ nguyên thứ tự CNNscore từ GNINA
-#      - Inter-ligand: xếp hạng chính theo CNN_VS
-#      - Sanity check: cờ đỏ khi CNN_VS cao + affinity kém
-#   TOÀN BỘ LOGIC DOCKING GIỮ NGUYÊN 100%
-#   CHỈ THAY ĐỔI: parse_top_scores, generate_excel_summary,
-#                  best-score console output
+# Thay đổi so với v2.6.1:
+#   🔴 FIX: Xóa RED_FLAG_CNN_VS_HIGH threshold cho CNN_VS.
+#       CNN_VS chỉ dùng để xếp hạng (rank), KHÔNG dùng ngưỡng
+#       tuyệt đối. Red Flag giờ chỉ dựa trên thermodynamic
+#       sanity (affinity kém hoặc dương/repulsive).
+#   Toàn bộ phần còn lại GIỐNG NGUYÊN v2.6.1
 # ============================================================
 
 import os
@@ -27,11 +21,10 @@ from pathlib import Path
 from rdkit import Chem
 
 # =============================================================
-# [MỚI v2.5] .env loading + LD_LIBRARY_PATH đảm bảo
+# .env loading + LD_LIBRARY_PATH đảm bảo
 # =============================================================
 NOTEBOOK_DIR = Path.cwd()
 
-# Đảm bảo LD_LIBRARY_PATH luôn đúng
 _conda_prefix = os.environ.get("CONDA_PREFIX", "")
 if _conda_prefix:
     _conda_lib = os.path.join(_conda_prefix, "lib")
@@ -53,7 +46,6 @@ except ImportError:
 
 
 def _resolve_path(env_var: str, fallback: str) -> str:
-    """Lấy path từ env var, fallback về giá trị mặc định."""
     raw = os.environ.get(env_var, fallback)
     expanded = os.path.expanduser(raw)
     if not os.path.isabs(expanded):
@@ -62,7 +54,7 @@ def _resolve_path(env_var: str, fallback: str) -> str:
 
 
 # =========================
-# GLOBAL CONFIG — path từ .env, logic giữ nguyên
+# GLOBAL CONFIG
 # =========================
 BASE_DIR = _resolve_path("DOCKING_BASE_DIR", str(NOTEBOOK_DIR))
 RESULTS_DIR = f"{BASE_DIR}/docking_results"
@@ -76,12 +68,31 @@ FLEX_RESIDUES = "A:182,A:181,A:215,A:262,A:49"
 SEED = "42"
 GPU_DEVICE = os.environ.get("GNINA_GPU_DEVICE", "0")
 
+# ================================================================
+# Arbitration thresholds
+# ================================================================
+# [v2.6.2] XÓA RED_FLAG_CNN_VS_HIGH.
+#
+# Lý do khoa học:
+#   CNN_VS (Virtual Screening score) là metric XẾP HẠNG TƯƠNG ĐỐI
+#   giữa các ligand trong cùng một chiến dịch sàng lọc. Giới khoa
+#   học (bao gồm đội GNINA tại CACHE Challenge #1) KHÔNG thiết lập
+#   ngưỡng tuyệt đối cho CNN_VS. Họ dùng nó thuần túy để rank,
+#   sau đó trích xuất top-N để phân tích tiếp.
+#
+#   Ngưỡng cứng 0.70 trước đây nhầm lẫn CNN_VS với CNNscore
+#   (xác suất hình học 0–1 của một pose đơn lẻ).
+#
+# Red Flag giờ chỉ dựa trên thermodynamic sanity:
+#   🟡 POSITIVE_AFFINITY: affinity > 0 (repulsive, vô nghĩa vật lý)
+#   🟠 POOR_AFFINITY: affinity ≥ threshold (gắn kết quá yếu)
+# ================================================================
+RED_FLAG_AFFINITY_POOR = -6.5
+
 # =====================================================
-# [v2.6] ARBITRATION THRESHOLDS — Ngưỡng cờ đỏ
+# [v2.6.1 FIX 1] GNINA timeout — configurable via .env
 # =====================================================
-# Nếu CNN_VS >= HIGH nhưng minimizedAffinity >= POOR → RED FLAG
-RED_FLAG_CNN_VS_HIGH = 0.70      # CNN_VS cao (top ~30%)
-RED_FLAG_AFFINITY_POOR = -6.5    # minimizedAffinity kém (> -6.5 kcal/mol)
+GNINA_TIMEOUT_SEC = int(os.environ.get("GNINA_TIMEOUT_SEC", "3600"))
 
 # GNINA_BIN — auto-detect
 _env_bin = os.environ.get("GNINA_BIN", "")
@@ -100,10 +111,9 @@ STATUS_FAILED = "FAILED"
 
 
 # =========================
-# Subprocess env — đảm bảo gnina tìm được thư viện
+# Subprocess env
 # =========================
 def _get_subprocess_env() -> dict:
-    """Tạo env dict cho subprocess, đảm bảo LD_LIBRARY_PATH có conda lib."""
     env = os.environ.copy()
     conda_prefix = env.get("CONDA_PREFIX", "")
     if conda_prefix:
@@ -117,14 +127,9 @@ def _get_subprocess_env() -> dict:
 
 
 # =========================
-# STATUS MANAGEMENT — 100% giữ nguyên code gốc
+# STATUS MANAGEMENT — giữ nguyên
 # =========================
 def write_status(lig_root: str, status: str, **kwargs):
-    """
-    Write status to STATUS.txt.
-    For RUNNING: overwrites file (new run)
-    For DONE/FAILED: appends to preserve history
-    """
     status_file = os.path.join(lig_root, "STATUS.txt")
 
     if status == STATUS_RUNNING:
@@ -141,7 +146,6 @@ def write_status(lig_root: str, status: str, **kwargs):
 
 
 def read_status(lig_root: str) -> str:
-    """Read the LAST status from STATUS.txt."""
     status_file = os.path.join(lig_root, "STATUS.txt")
 
     if not os.path.exists(status_file):
@@ -160,7 +164,6 @@ def read_status(lig_root: str) -> str:
 
 
 def get_status_details(lig_root: str) -> dict:
-    """Parse full status file into dictionary"""
     status_file = os.path.join(lig_root, "STATUS.txt")
     details = {}
 
@@ -175,10 +178,9 @@ def get_status_details(lig_root: str) -> dict:
 
 
 # =========================
-# UTILS — 100% giữ nguyên code gốc
+# UTILS — giữ nguyên
 # =========================
 def sanitize_name(name: str, max_len: int = 80) -> str:
-    """Make a filesystem-safe ligand name."""
     if not name:
         return "NA"
 
@@ -191,10 +193,9 @@ def sanitize_name(name: str, max_len: int = 80) -> str:
 
 
 # =========================
-# PREPARE ROOT FOLDERS — 100% giữ nguyên code gốc
+# PREPARE ROOT FOLDERS — giữ nguyên
 # =========================
 def prepare_root_folders():
-    """Create directory structure and copy reference files"""
     dirs = [
         f"{RESULTS_DIR}/protein",
         f"{RESULTS_DIR}/reference",
@@ -218,16 +219,11 @@ def prepare_root_folders():
 
 
 # =========================
-# SPLIT LIGANDS — FIX warning "tagged 2D" + line endings
+# SPLIT LIGANDS — giữ nguyên
 # =========================
 def split_ligands(input_sdf: str, ligands_root: str) -> list:
-    """Split multi-ligand SDF into per-ligand folders.
-    Fix: normalize \\r\\n → \\n and force 3D tag where appropriate.
-    Includes validation and logging for reproducibility.
-    """
     os.makedirs(ligands_root, exist_ok=True)
 
-    # ── FIX 1: Normalize line endings only if needed ──
     cleaned_sdf = os.path.join(ligands_root, "_cleaned_input.sdf")
     with open(input_sdf, "rb") as f_in:
         raw = f_in.read()
@@ -242,7 +238,6 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
         sdf_to_parse = input_sdf
         print(f"✔ Input SDF has clean line endings — no fix needed")
 
-    # ── Parse SDF ──
     suppl = Chem.SDMolSupplier(sdf_to_parse, removeHs=False, sanitize=True)
     ligands = []
     mapping = []
@@ -255,7 +250,6 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
 
         lig_id = f"LIG_{idx:04d}"
 
-        # ── FIX 2: Force 3D tag if Z coordinates exist ──
         conf = mol.GetConformer() if mol.GetNumConformers() > 0 else None
         if conf is not None:
             has_z = any(
@@ -301,7 +295,6 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
         )
         mapping.append((lig_id, lig_dirname, orig_name, smiles))
 
-    # ── Write mapping CSV ──
     mapping_file = os.path.join(ligands_root, "ligand_mapping.csv")
     with open(mapping_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -309,7 +302,6 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
         for row in mapping:
             writer.writerow(row)
 
-    # ── LOG: Forced 3D records ──
     if forced_3d_list:
         forced_log = os.path.join(ligands_root, "forced_3d_log.txt")
         with open(forced_log, "w") as f:
@@ -319,7 +311,6 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
                 f.write(f"{lid}\n")
         print(f"📝 Forced 3D log: {forced_log} ({len(forced_3d_list)} ligands)")
 
-    # ── VALIDATE: Verify output 3D/2D status ──
     count_3d = 0
     count_2d = 0
     for lig in ligands:
@@ -333,7 +324,6 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
     if count_2d > 0:
         print(f"⚠️ WARNING: {count_2d} molecules still tagged 2D — check input geometry")
 
-    # ── CLEANUP: Remove temporary file ──
     if os.path.exists(cleaned_sdf):
         os.remove(cleaned_sdf)
 
@@ -344,21 +334,15 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
 
 
 # ================================================================
-# [v2.6] SCORE PARSING — Tuân theo Arbitration Protocol
+# SCORE PARSING — Arbitration Protocol (giữ nguyên parse_top_poses)
 # ================================================================
 def parse_top_poses(sdf_path: str, n: int = 3) -> list:
     """
     Extract top N poses from docked SDF.
 
     QUAN TRỌNG (Arbitration Protocol — Tầng 1):
-    ────────────────────────────────────────────
     GNINA đã sắp xếp output theo --pose_sort_order CNNscore.
-    Pose 1 trong file = pose có CNNscore cao nhất = pose tự nhiên nhất.
-
     Hàm này GIỮ NGUYÊN thứ tự từ file (KHÔNG re-sort).
-    Pose đầu tiên trong list trả về = Best Pose theo CNNscore.
-
-    Returns: List of dicts, giữ nguyên thứ tự file (CNNscore descending)
     """
     try:
         suppl = Chem.SDMolSupplier(sdf_path, removeHs=False)
@@ -370,7 +354,6 @@ def parse_top_poses(sdf_path: str, n: int = 3) -> list:
 
             pose_data = {"pose_rank": pose_idx}
 
-            # Extract all relevant properties
             score_props = [
                 "minimizedAffinity",
                 "CNNscore",
@@ -390,7 +373,6 @@ def parse_top_poses(sdf_path: str, n: int = 3) -> list:
 
             poses.append(pose_data)
 
-            # Chỉ lấy n poses đầu tiên — đã sorted bởi GNINA
             if len(poses) >= n:
                 break
 
@@ -401,25 +383,40 @@ def parse_top_poses(sdf_path: str, n: int = 3) -> list:
         return []
 
 
-def classify_red_flag(cnn_vs: float, affinity: float) -> str:
+# ================================================================
+# [v2.6.2] classify_red_flag — XÓA ngưỡng CNN_VS
+# ================================================================
+def classify_red_flag(affinity) -> str:
     """
     Arbitration Protocol — Tầng 3: Thermodynamic Sanity Check.
 
-    Trả về:
-      "🔴 RED FLAG"  — CNN_VS cao nhưng affinity kém → nghi ngờ steric clash
-      "🟡 CAUTION"   — affinity dương → vật lý vô nghĩa
-      ""             — bình thường
+    [v2.6.2] Chỉ kiểm tra affinity. CNN_VS KHÔNG có ngưỡng tuyệt đối.
+
+    Lý do khoa học:
+      CNN_VS là metric xếp hạng tương đối (relative ranking metric)
+      giữa các ligand trong cùng một chiến dịch sàng lọc. Đội ngũ
+      tác giả GNINA (CACHE Challenge #1, giải nhất toàn cầu) sử
+      dụng CNN_VS thuần túy để rank, KHÔNG áp ngưỡng tuyệt đối.
+
+      Ngưỡng cứng cho CNN_VS gây rủi ro:
+        - False negatives trên các túi gắn lạ (novel binding sites)
+        - Nhầm lẫn bản chất CNN_VS (ranking) với CNNscore (per-pose
+          probability)
+
+    Sanity flags dựa trên nhiệt động học:
+      🟡 POSITIVE_AFFINITY: affinity > 0 kcal/mol (repulsive, vô nghĩa
+         vật lý — ligand bị đẩy ra khỏi túi gắn)
+      🟠 POOR_AFFINITY: affinity ≥ threshold (gắn kết quá yếu, không
+         đủ ý nghĩa sinh học tại điều kiện phòng thí nghiệm)
     """
-    if affinity is None or cnn_vs is None:
+    if affinity is None:
         return ""
 
-    # Affinity dương = repulsive = vô nghĩa nhiệt động học
     if affinity > 0:
         return "🟡 POSITIVE_AFFINITY"
 
-    # CNN_VS cao nhưng affinity kém
-    if cnn_vs >= RED_FLAG_CNN_VS_HIGH and affinity >= RED_FLAG_AFFINITY_POOR:
-        return "🔴 RED_FLAG"
+    if affinity >= RED_FLAG_AFFINITY_POOR:
+        return "🟠 POOR_AFFINITY"
 
     return ""
 
@@ -427,7 +424,6 @@ def classify_red_flag(cnn_vs: float, affinity: float) -> str:
 def get_best_pose_summary(sdf_path: str) -> dict:
     """
     Lấy pose tốt nhất (pose 1 = CNNscore cao nhất) và tính red flag.
-    Dùng cho console output và inter-ligand ranking.
     """
     poses = parse_top_poses(sdf_path, n=1)
     if not poses:
@@ -440,30 +436,38 @@ def get_best_pose_summary(sdf_path: str) -> dict:
         }
 
     best = poses[0]
-    best["red_flag"] = classify_red_flag(
-        best.get("CNN_VS"), best.get("minimizedAffinity")
-    )
+    # [v2.6.2] classify_red_flag chỉ cần affinity
+    best["red_flag"] = classify_red_flag(best.get("minimizedAffinity"))
     return best
 
 
 # ================================================================
-# [v2.6] BACKWARD COMPAT — parse_best_score giữ nguyên cho console
+# [v2.6.1 FIX 2] parse_best_score — return None thay vì 0.0
 # ================================================================
-def parse_best_score(sdf_path: str) -> float:
+def parse_best_score(sdf_path: str):
     """Extract best minimizedAffinity from docked SDF.
-    Dùng cho console output — giữ nguyên behavior gốc.
+
+    [v2.6.1] Returns None nếu không parse được.
+    Trước đây trả về 0.0 — gây nhầm lẫn vì 0.0 là giá trị
+    affinity hợp lệ (dương, repulsive).
     """
     poses = parse_top_poses(sdf_path, n=1)
     if poses and poses[0].get("minimizedAffinity") is not None:
         return poses[0]["minimizedAffinity"]
-    return 0.0
+    return None
 
 
-# =========================
-# RUN GNINA — 100% giữ nguyên logic, chỉ thêm env= cho subprocess
-# =========================
+# ================================================================
+# [v2.6.1 FIX 1+2] RUN GNINA — thêm timeout + xử lý None score
+# ================================================================
 def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
-    """Run GNINA docking for a single ligand."""
+    """Run GNINA docking for a single ligand.
+
+    [v2.6.1] Thay đổi so với v2.6:
+      - subprocess.run có timeout=GNINA_TIMEOUT_SEC
+      - Bắt subprocess.TimeoutExpired riêng
+      - parse_best_score trả về None → xử lý đúng trong console + status
+    """
     lig_id = ligand_info["lig_id"]
     lig_root = ligand_info["lig_root"]
     ligand_sdf = ligand_info["ligand_sdf"]
@@ -533,26 +537,50 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
                 stderr=stderr_f,
                 text=True,
                 env=_get_subprocess_env(),
+                # ── [v2.6.1 FIX 1] timeout ──
+                timeout=GNINA_TIMEOUT_SEC,
             )
 
         if not os.path.exists(out_lig) or os.path.getsize(out_lig) == 0:
             raise RuntimeError("GNINA produced empty output SDF")
 
         elapsed = (time.time() - start) / 60
+
+        # ── [v2.6.1 FIX 2] parse_best_score returns None khi fail ──
         best_score = parse_best_score(out_lig)
 
         write_status(
             lig_root,
             STATUS_DONE,
             elapsed_min=f"{elapsed:.2f}",
-            best_affinity=f"{best_score:.4f}" if best_score else "NA",
+            best_affinity=(
+                f"{best_score:.4f}" if best_score is not None else "NA"
+            ),
         )
 
+        # Console output — giữ nguyên format, xử lý None
+        score_str = f"{best_score:.4f}" if best_score is not None else "N/A"
         print(
             f"✅ [{idx}/{total}] {lig_id} DONE in {elapsed:.2f} min"
-            f" (affinity: {best_score:.4f})"
+            f" (affinity: {score_str})"
         )
         return True
+
+    # ── [v2.6.1 FIX 1] Bắt timeout riêng ──
+    except subprocess.TimeoutExpired:
+        elapsed = (time.time() - start) / 60
+        timeout_min = GNINA_TIMEOUT_SEC / 60
+        write_status(
+            lig_root,
+            STATUS_FAILED,
+            elapsed_min=f"{elapsed:.2f}",
+            error=f"TIMEOUT after {GNINA_TIMEOUT_SEC}s ({timeout_min:.0f}min)",
+        )
+        print(
+            f"⏰ [{idx}/{total}] {lig_id} TIMEOUT after"
+            f" {timeout_min:.0f} min — skipping"
+        )
+        return False
 
     except subprocess.CalledProcessError as e:
         elapsed = (time.time() - start) / 60
@@ -581,27 +609,9 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
 
 
 # ================================================================
-# [v2.6] EXCEL SUMMARY — Redesigned theo Arbitration Protocol
+# EXCEL SUMMARY — [v2.6.2] cập nhật Red Flag text + xóa CNN_VS threshold
 # ================================================================
 def generate_excel_summary(ligands: list, summary_dir: str):
-    """
-    Generate Excel summary tuân theo Arbitration Protocol 3 tầng:
-
-    Sheet 1 "Intra-Ligand Poses":
-        Mỗi ligand hiển thị top 3 poses GIỮA NGUYÊN thứ tự CNNscore
-        từ GNINA (Tầng 1). Không re-sort.
-
-    Sheet 2 "Inter-Ligand Ranking":
-        So sánh GIỮA các ligand. Xếp hạng chính theo CNN_VS của
-        best pose (Tầng 2). Kèm cờ đỏ từ sanity check (Tầng 3).
-
-    Sheet 3 "Red Flags":
-        Chỉ hiển thị các ligand bị gắn cờ đỏ để người dùng
-        kiểm tra thủ công.
-
-    Sheet 4 "Statistics":
-        Thống kê tổng hợp.
-    """
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -611,7 +621,6 @@ def generate_excel_summary(ligands: list, summary_dir: str):
         print("⚠️ openpyxl not installed, generating CSV instead")
         USE_OPENPYXL = False
 
-    # ── Collect all results ──
     results = []
     for lig in ligands:
         lig_root = lig["lig_root"]
@@ -634,21 +643,20 @@ def generate_excel_summary(ligands: list, summary_dir: str):
                 "smiles": lig["smiles"],
                 "status": status,
                 "elapsed_min": details.get("ELAPSED_MIN", ""),
-                "top_poses": top_poses,       # Tầng 1: thứ tự CNNscore
-                "best_CNN_VS": best_pose.get("CNN_VS"),        # Tầng 2
+                "top_poses": top_poses,
+                "best_CNN_VS": best_pose.get("CNN_VS"),
                 "best_CNNscore": best_pose.get("CNNscore"),
                 "best_CNNaffinity": best_pose.get("CNNaffinity"),
                 "best_affinity": best_pose.get("minimizedAffinity"),
-                "red_flag": best_pose.get("red_flag", ""),     # Tầng 3
+                "red_flag": best_pose.get("red_flag", ""),
             }
         )
 
-    # ── Tầng 2: Sort theo CNN_VS descending (cao = tốt) ──
     results_by_cnn_vs = sorted(
         results,
         key=lambda x: (
-            x["best_CNN_VS"] is None,              # None xuống cuối
-            -(x["best_CNN_VS"] or 0),               # Cao nhất lên đầu
+            x["best_CNN_VS"] is None,
+            -(x["best_CNN_VS"] or 0),
         ),
     )
 
@@ -661,7 +669,6 @@ def generate_excel_summary(ligands: list, summary_dir: str):
 def _generate_xlsx_v26(
     results: list, results_by_cnn_vs: list, summary_dir: str
 ):
-    """Generate Excel file theo Arbitration Protocol."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -669,7 +676,6 @@ def _generate_xlsx_v26(
 
     wb = Workbook()
 
-    # ── Style definitions ──
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill_blue = PatternFill(
         start_color="2F5496", end_color="2F5496", fill_type="solid"
@@ -694,6 +700,9 @@ def _generate_xlsx_v26(
     )
     caution_fill = PatternFill(
         start_color="FFD93D", end_color="FFD93D", fill_type="solid"
+    )
+    poor_affinity_fill = PatternFill(
+        start_color="FFA94D", end_color="FFA94D", fill_type="solid"
     )
     excellent_fill = PatternFill(
         start_color="92D050", end_color="92D050", fill_type="solid"
@@ -721,13 +730,10 @@ def _generate_xlsx_v26(
         for col_letter, width in widths.items():
             ws.column_dimensions[col_letter].width = width
 
-    # ================================================================
-    # SHEET 1: Intra-Ligand Poses (Tầng 1)
-    # ================================================================
+    # ── SHEET 1: Intra-Ligand Poses (Tầng 1) ──
     ws1 = wb.active
     ws1.title = "Intra-Ligand_Poses"
 
-    # Protocol note in row 1
     ws1.merge_cells("A1:S1")
     note_cell = ws1.cell(
         row=1,
@@ -747,23 +753,19 @@ def _generate_xlsx_v26(
         "Original_Name",
         "Status",
         "Time_min",
-        # ── Pose 1 (Best by CNNscore) ──
         "P1_CNNscore",
         "P1_CNN_VS",
         "P1_CNNaffinity",
         "P1_Affinity",
         "P1_Flag",
-        # ── Pose 2 ──
         "P2_CNNscore",
         "P2_CNN_VS",
         "P2_CNNaffinity",
         "P2_Affinity",
-        # ── Pose 3 ──
         "P3_CNNscore",
         "P3_CNN_VS",
         "P3_CNNaffinity",
         "P3_Affinity",
-        # ──
         "SMILES",
     ]
 
@@ -782,12 +784,10 @@ def _generate_xlsx_v26(
             data["elapsed_min"],
         ]
 
-        # Pose 1 — best by CNNscore
         if len(top_poses) >= 1:
             p = top_poses[0]
-            flag = classify_red_flag(
-                p.get("CNN_VS"), p.get("minimizedAffinity")
-            )
+            # [v2.6.2] classify_red_flag chỉ cần affinity
+            flag = classify_red_flag(p.get("minimizedAffinity"))
             row_data.extend([
                 p.get("CNNscore", ""),
                 p.get("CNN_VS", ""),
@@ -798,7 +798,6 @@ def _generate_xlsx_v26(
         else:
             row_data.extend(["", "", "", "", ""])
 
-        # Pose 2
         if len(top_poses) >= 2:
             p = top_poses[1]
             row_data.extend([
@@ -810,7 +809,6 @@ def _generate_xlsx_v26(
         else:
             row_data.extend(["", "", "", ""])
 
-        # Pose 3
         if len(top_poses) >= 3:
             p = top_poses[2]
             row_data.extend([
@@ -828,20 +826,19 @@ def _generate_xlsx_v26(
             cell = ws1.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
-            # Status highlighting
             if col_idx == 4:
                 if value == STATUS_DONE:
                     cell.fill = done_fill
                 elif value == STATUS_FAILED:
                     cell.fill = failed_fill
 
-            # Red flag highlighting
-            if col_idx == 10:  # P1_Flag column
-                if "RED_FLAG" in str(value):
-                    cell.fill = red_flag_fill
-                    cell.font = Font(bold=True, color="FFFFFF")
-                elif "POSITIVE" in str(value):
+            # [v2.6.2] Cập nhật flag styling — thêm POOR_AFFINITY
+            if col_idx == 10:
+                if "POSITIVE" in str(value):
                     cell.fill = caution_fill
+                    cell.font = Font(bold=True)
+                elif "POOR" in str(value):
+                    cell.fill = poor_affinity_fill
                     cell.font = Font(bold=True)
 
     _set_col_widths(ws1, {
@@ -852,22 +849,20 @@ def _generate_xlsx_v26(
         "S": 60,
     })
 
-    # ================================================================
-    # SHEET 2: Inter-Ligand Ranking (Tầng 2) — Top 50 by CNN_VS
-    # ================================================================
+    # ── SHEET 2: Inter-Ligand Ranking (Tầng 2) ──
     ws2 = wb.create_sheet(title="Inter-Ligand_Ranking")
 
-    # Protocol note
     ws2.merge_cells("A1:I1")
+    # [v2.6.2] Cập nhật note — CNN_VS chỉ để rank
     note2 = ws2.cell(
         row=1,
         column=1,
         value=(
             "TẦNG 2 — INTER-LIGAND VIRTUAL SCREENING: "
             "Xếp hạng theo CNN_VS (cao = tốt). "
-            "CNN_VS cung cấp enrichment factor xuất sắc cho "
-            "sàng lọc ảo linh hoạt. "
-            "Cột Flag = Tầng 3 Sanity Check."
+            "CNN_VS là metric xếp hạng tương đối — KHÔNG có ngưỡng "
+            "tuyệt đối. Dùng ranking để chọn top-N cho phân tích tiếp. "
+            "Cột Flag = Tầng 3 Thermodynamic Sanity Check (chỉ dựa trên affinity)."
         ),
     )
     note2.font = Font(bold=True, italic=True, size=10, color="548235")
@@ -908,14 +903,10 @@ def _generate_xlsx_v26(
             cell = ws2.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
-            # CNN_VS highlighting
-            if col_idx == 4 and isinstance(value, (int, float)):
-                if value >= 0.80:
-                    cell.fill = excellent_fill
-                elif value >= 0.60:
-                    cell.fill = good_fill
+            # [v2.6.2] CNN_VS column — NO threshold coloring
+            # CNN_VS is a ranking metric, not a threshold metric.
+            # Users should interpret rank position, not absolute values.
 
-            # Affinity cross-check highlighting
             if col_idx == 7 and isinstance(value, (int, float)):
                 if value > 0:
                     cell.fill = caution_fill
@@ -927,13 +918,13 @@ def _generate_xlsx_v26(
                         fill_type="solid",
                     )
 
-            # Flag highlighting
+            # [v2.6.2] Cập nhật flag styling
             if col_idx == 8:
-                if "RED_FLAG" in str(value):
-                    cell.fill = red_flag_fill
-                    cell.font = Font(bold=True, color="FFFFFF")
-                elif "POSITIVE" in str(value):
+                if "POSITIVE" in str(value):
                     cell.fill = caution_fill
+                    cell.font = Font(bold=True)
+                elif "POOR" in str(value):
+                    cell.fill = poor_affinity_fill
                     cell.font = Font(bold=True)
 
     _set_col_widths(ws2, {
@@ -941,22 +932,22 @@ def _generate_xlsx_v26(
         "F": 13, "G": 13, "H": 22, "I": 60,
     })
 
-    # ================================================================
-    # SHEET 3: Red Flags (Tầng 3 — Thermodynamic Sanity Check)
-    # ================================================================
-    ws3 = wb.create_sheet(title="Red_Flags")
+    # ── SHEET 3: Red Flags (Tầng 3) ──
+    ws3 = wb.create_sheet(title="Sanity_Flags")
 
-    # Protocol note
     ws3.merge_cells("A1:J1")
+    # [v2.6.2] Cập nhật note — không còn CNN_VS threshold
     note3 = ws3.cell(
         row=1,
         column=1,
         value=(
             "TẦNG 3 — THERMODYNAMIC SANITY CHECK: "
-            f"🔴 RED_FLAG = CNN_VS ≥ {RED_FLAG_CNN_VS_HIGH} "
-            f"nhưng Affinity ≥ {RED_FLAG_AFFINITY_POOR} kcal/mol. "
-            "🟡 POSITIVE_AFFINITY = Affinity > 0 (repulsive, vô nghĩa). "
-            "Các ligand này CẦN kiểm tra thủ công bằng visualisation."
+            "🟡 POSITIVE_AFFINITY = Affinity > 0 kcal/mol (repulsive, "
+            "vô nghĩa vật lý). "
+            f"🟠 POOR_AFFINITY = Affinity ≥ {RED_FLAG_AFFINITY_POOR} "
+            "kcal/mol (gắn kết quá yếu). "
+            "Các ligand này CẦN kiểm tra thủ công bằng visualisation. "
+            "CNN_VS KHÔNG được dùng làm tiêu chí gắn cờ (chỉ dùng để rank)."
         ),
     )
     note3.font = Font(bold=True, italic=True, size=10, color="C00000")
@@ -983,16 +974,19 @@ def _generate_xlsx_v26(
         for row_idx, data in enumerate(flagged, start=3):
             flag = data["red_flag"]
 
-            if "RED_FLAG" in flag:
-                concern = (
-                    f"CNN_VS={data['best_CNN_VS']:.3f} cao "
-                    f"nhưng Affinity={data['best_affinity']:.2f} kém. "
-                    "Có thể steric clash mà CNN bỏ sót."
-                )
-            elif "POSITIVE" in flag:
+            # [v2.6.2] Cập nhật concern messages
+            if "POSITIVE" in flag:
                 concern = (
                     f"Affinity={data['best_affinity']:.2f} > 0 (repulsive). "
-                    "Pose này vi phạm nhiệt động học cơ bản."
+                    "Pose này vi phạm nhiệt động học cơ bản — "
+                    "ligand bị đẩy ra khỏi túi gắn."
+                )
+            elif "POOR" in flag:
+                concern = (
+                    f"Affinity={data['best_affinity']:.2f} ≥ "
+                    f"{RED_FLAG_AFFINITY_POOR} kcal/mol. "
+                    "Gắn kết quá yếu — không đủ ý nghĩa sinh học. "
+                    "Cần kiểm tra tương tác bằng visualisation."
                 )
             else:
                 concern = ""
@@ -1014,18 +1008,19 @@ def _generate_xlsx_v26(
                 cell = ws3.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
 
+                # [v2.6.2] Cập nhật styling
                 if col_idx == 4:
-                    if "RED_FLAG" in str(value):
-                        cell.fill = red_flag_fill
-                        cell.font = Font(bold=True, color="FFFFFF")
-                    elif "POSITIVE" in str(value):
+                    if "POSITIVE" in str(value):
                         cell.fill = caution_fill
+                        cell.font = Font(bold=True)
+                    elif "POOR" in str(value):
+                        cell.fill = poor_affinity_fill
                         cell.font = Font(bold=True)
     else:
         ws3.cell(
             row=3,
             column=1,
-            value="✅ Không có ligand nào bị gắn cờ đỏ — Tất cả đều pass sanity check.",
+            value="✅ Không có ligand nào bị gắn cờ — Tất cả đều pass sanity check.",
         ).font = Font(italic=True, color="548235", size=12)
 
     _set_col_widths(ws3, {
@@ -1033,9 +1028,7 @@ def _generate_xlsx_v26(
         "F": 12, "G": 13, "H": 13, "I": 60, "J": 60,
     })
 
-    # ================================================================
-    # SHEET 4: Statistics
-    # ================================================================
+    # ── SHEET 4: Statistics ──
     ws4 = wb.create_sheet(title="Statistics")
 
     total = len(results)
@@ -1051,9 +1044,22 @@ def _generate_xlsx_v26(
         if r["best_affinity"] is not None
     ]
 
-    n_red_flag = sum(1 for r in results if "RED_FLAG" in r.get("red_flag", ""))
+    # [v2.6.2] Cập nhật flag counting
+    n_poor = sum(1 for r in results if "POOR" in r.get("red_flag", ""))
     n_positive = sum(
         1 for r in results if "POSITIVE" in r.get("red_flag", "")
+    )
+    n_flagged = n_poor + n_positive
+
+    n_timeout = sum(
+        1
+        for r in results
+        if r["status"] == STATUS_FAILED
+        and "TIMEOUT" in get_status_details(
+            os.path.join(
+                RESULTS_DIR, "ligands", r["lig_dirname"]
+            )
+        ).get("ERROR", "")
     )
 
     stats = [
@@ -1061,9 +1067,11 @@ def _generate_xlsx_v26(
         ("Total Ligands", total),
         ("Completed", done),
         ("Failed", failed),
+        ("  ↳ of which TIMEOUT", n_timeout),
         ("Pending", pending),
+        ("GNINA Timeout Setting", f"{GNINA_TIMEOUT_SEC}s ({GNINA_TIMEOUT_SEC/60:.0f}min)"),
         ("", ""),
-        ("═══ CNN_VS DISTRIBUTION (Tầng 2) ═══", ""),
+        ("═══ CNN_VS DISTRIBUTION (Tầng 2 — Ranking Only) ═══", ""),
         (
             "Best CNN_VS",
             f"{max(cnn_vs_values):.4f}" if cnn_vs_values else "N/A",
@@ -1080,16 +1088,21 @@ def _generate_xlsx_v26(
                 else "N/A"
             ),
         ),
+        # [v2.6.2] Giữ distribution stats nhưng ghi rõ "for reference only"
         (
-            "Ligands CNN_VS ≥ 0.80",
+            "Ligands CNN_VS ≥ 0.80 (ref only)",
             sum(1 for v in cnn_vs_values if v >= 0.80),
         ),
         (
-            "Ligands CNN_VS ≥ 0.60",
+            "Ligands CNN_VS ≥ 0.60 (ref only)",
             sum(1 for v in cnn_vs_values if v >= 0.60),
         ),
+        (
+            "NOTE",
+            "CNN_VS has NO absolute threshold — use ranking position only",
+        ),
         ("", ""),
-        ("═══ AFFINITY DISTRIBUTION (cross-check) ═══", ""),
+        ("═══ AFFINITY DISTRIBUTION ═══", ""),
         (
             "Best Affinity (kcal/mol)",
             f"{min(affinities):.4f}" if affinities else "N/A",
@@ -1120,15 +1133,18 @@ def _generate_xlsx_v26(
         ),
         ("", ""),
         ("═══ SANITY CHECK (Tầng 3) ═══", ""),
-        ("🔴 Red Flags (CNN_VS↑ + Affinity↓)", n_red_flag),
         ("🟡 Positive Affinity (repulsive)", n_positive),
-        ("✅ Clean (no flags)", done - n_red_flag - n_positive),
+        (f"🟠 Poor Affinity (≥ {RED_FLAG_AFFINITY_POOR})", n_poor),
+        ("✅ Clean (no flags)", done - n_flagged),
         ("", ""),
         ("═══ ARBITRATION THRESHOLDS ═══", ""),
-        ("Red Flag CNN_VS threshold", f"≥ {RED_FLAG_CNN_VS_HIGH}"),
         (
-            "Red Flag Affinity threshold",
+            "Poor Affinity threshold",
             f"≥ {RED_FLAG_AFFINITY_POOR} kcal/mol",
+        ),
+        (
+            "CNN_VS threshold",
+            "NONE — ranking metric only (no absolute cutoff)",
         ),
     ]
 
@@ -1151,9 +1167,8 @@ def _generate_xlsx_v26(
         else:
             label_cell.font = Font(bold=True)
 
-    _set_col_widths(ws4, {"A": 38, "B": 20})
+    _set_col_widths(ws4, {"A": 42, "B": 52})
 
-    # ── Save ──
     excel_path = os.path.join(summary_dir, "docking_summary.xlsx")
     wb.save(excel_path)
     print(f"✔ Excel summary saved to {excel_path}")
@@ -1162,7 +1177,6 @@ def _generate_xlsx_v26(
 
 
 def _generate_csv_fallback_v26(results_sorted: list, summary_dir: str):
-    """Fallback CSV — xếp hạng theo CNN_VS."""
     csv_path = os.path.join(summary_dir, "docking_summary.csv")
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
@@ -1203,10 +1217,9 @@ def _generate_csv_fallback_v26(results_sorted: list, summary_dir: str):
 
 
 # =========================
-# PROGRESS TRACKING — 100% giữ nguyên code gốc
+# PROGRESS TRACKING — giữ nguyên
 # =========================
 def update_progress_csv(ligands: list, summary_dir: str):
-    """Generate progress.csv with current status of all ligands"""
     progress_file = os.path.join(summary_dir, "progress.csv")
 
     with open(progress_file, "w", newline="", encoding="utf-8") as f:
@@ -1241,7 +1254,6 @@ def update_progress_csv(ligands: list, summary_dir: str):
 def print_progress_summary(
     finished: list, failed: list, skipped: list, total: int
 ):
-    """Print current progress"""
     done = len(finished) + len(skipped)
     pct = (done / total) * 100 if total > 0 else 0
     print(
@@ -1253,11 +1265,11 @@ def print_progress_summary(
 
 
 # =========================
-# MAIN PIPELINE — logic giữ nguyên, console output giữ nguyên
+# MAIN PIPELINE
 # =========================
 def main():
     print("=" * 60)
-    print("🧬 GNINA Flexible Docking Pipeline v2.6")
+    print("🧬 GNINA Flexible Docking Pipeline v2.6.2")
     print("   Arbitration Protocol: CNNscore → CNN_VS → Sanity Check")
     print("=" * 60)
     print(f"📂 Base dir:  {BASE_DIR}")
@@ -1266,11 +1278,12 @@ def main():
     print(f"📎 Ref lig:   {REF_LIGAND}")
     print(f"📦 Ligands:   {LIGAND_SDF}")
     print(f"🎯 Flex res:  {FLEX_RESIDUES}")
-    print(f"🚩 Red flag:  CNN_VS≥{RED_FLAG_CNN_VS_HIGH} & "
-          f"Affinity≥{RED_FLAG_AFFINITY_POOR}")
+    # [v2.6.2] Cập nhật flag display — không còn CNN_VS threshold
+    print(f"🚩 Sanity:    Affinity≥{RED_FLAG_AFFINITY_POOR} or >0 → flagged")
+    print(f"📊 CNN_VS:    Ranking only (no absolute threshold)")
+    print(f"⏱️  Timeout:   {GNINA_TIMEOUT_SEC}s ({GNINA_TIMEOUT_SEC/60:.0f} min/ligand)")
     print("=" * 60)
 
-    # Verify gnina binary exists
     if not os.path.isfile(GNINA_BIN):
         print(f"❌ GNINA binary not found: {GNINA_BIN}")
         return
@@ -1278,10 +1291,8 @@ def main():
         print(f"❌ GNINA binary not executable: {GNINA_BIN}")
         return
 
-    # Setup
     prepare_root_folders()
 
-    # Split ligands
     ligands = split_ligands(
         LIGAND_SDF, ligands_root=f"{RESULTS_DIR}/ligands"
     )
@@ -1326,7 +1337,6 @@ def main():
             update_progress_csv(ligands, f"{RESULTS_DIR}/summary")
             print_progress_summary(finished, failed, skipped, total)
 
-    # Final summary
     elapsed_all = (time.time() - start_all) / 60
 
     summary_dir = f"{RESULTS_DIR}/summary"
@@ -1339,7 +1349,6 @@ def main():
 
     update_progress_csv(ligands, summary_dir)
 
-    # ========== GENERATE EXCEL SUMMARY ==========
     print("\n📊 Generating Excel summary (Arbitration Protocol)...")
     generate_excel_summary(ligands, summary_dir)
 
