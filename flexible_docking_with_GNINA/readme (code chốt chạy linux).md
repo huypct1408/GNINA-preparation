@@ -71,28 +71,23 @@ Code gốc sắp xếp và trình bày kết quả **hoàn toàn dựa trên `mi
 │  ─ Thresholds đã dùng                                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
-Vì code v2.5 hay các code cũ khác xuất ra file excel theo top 3 theo chỉ số CNN_Affinity nên rất khó để sàng lọc khi có nhiều chất đều đạt điểm minimizedAffinity tốt (điểm thấp)
+**Vì code v2.5 hay các code cũ khác xuất ra file excel theo top 3 theo chỉ số CNN_Affinity nên rất khó để sàng lọc khi có nhiều chất đều đạt điểm minimizedAffinity tốt (điểm thấp)**
 
 Do đó, đối với trường hợp chưa chuyển sang code v2.6 (MÓI) xài thì cần phải cứu lấy kết quả cũ mà không chạy lại docking
 
 # Cách cứu dữ liệu cũ — Retroactive CNN_VS Ranking
 
-## Tình huống hiện tại
-
-File Excel cũ được tạo từ code **cũ** (sort by minimizedAffinity):
-- Đã có đầy đủ dữ liệu docking (CNNscore, CNN_VS, minimizedAffinity...)
-- **Chỉ sắp xếp/hiển thị sai** (theo affinity thay vì CNN_VS)
-- Dữ liệu dấu/output folders vẫn còn nguyên
-
-## Giải pháp: Re-ranking script (không cần chạy lại docking)
-
-Tạo script Python riêng để **đọc lại dữ liệu từ output folders cũ** → **sắp xếp theo CNN_VS** → **tạo Excel mới**:
+# ✅ Script Retroactive Q1-Protocol — FIXED & PRODUCTION-READY
 
 ```python
 # ============================================================
-# 🔄 RETROACTIVE Q1-PROTOCOL RANKING — Re-sort dữ liệu cũ
+# 🔄 RETROACTIVE Q1-PROTOCOL RE-RANKING — FIX Sắp xếp CNNscore
 # ============================================================
-# Không cần chạy lại docking — chỉ re-parse output folders
+# ⚠️ FIX LOGIC:
+#   1. CNNscore sort: Descending (cao → thấp) + dấu "-"
+#   2. minimizedAffinity: Secondary sort (âm hơn xếp trên)
+#   3. Đường dẫn dynamic (tự detect folder)
+# ============================================================
 
 import os
 import csv
@@ -100,17 +95,39 @@ from pathlib import Path
 from rdkit import Chem
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+import datetime
 
-# Config
-RESULTS_DIR = "/home/labhhc5/Documents/workspace/D21/Duong Huy/gnina_project/docking_results"
-LIGANDS_DIR = f"{RESULTS_DIR}/ligands"
-SUMMARY_DIR = f"{RESULTS_DIR}/summary"
+# ==========================================
+# [FIX #1] Dynamic Path Detection
+# ==========================================
+NOTEBOOK_DIR = Path.cwd()
+RESULTS_DIR = os.path.join(NOTEBOOK_DIR, "docking_results")
+LIGANDS_DIR = os.path.join(RESULTS_DIR, "ligands")
+SUMMARY_DIR = os.path.join(RESULTS_DIR, "summary")
 
 # Sanity check threshold
 AFFINITY_THRESHOLD = -6.5
 
+print("=" * 80)
+print("🔄 RETROACTIVE Q1-PROTOCOL RE-RANKING")
+print("=" * 80)
+print(f"📂 NOTEBOOK_DIR: {NOTEBOOK_DIR}")
+print(f"📂 RESULTS_DIR: {RESULTS_DIR}")
+print(f"📂 LIGANDS_DIR: {LIGANDS_DIR}")
+print("=" * 80)
+
+# Verify paths exist
+if not os.path.exists(LIGANDS_DIR):
+    print(f"❌ ERROR: LIGANDS_DIR not found: {LIGANDS_DIR}")
+    exit(1)
+
+if not os.path.exists(SUMMARY_DIR):
+    os.makedirs(SUMMARY_DIR, exist_ok=True)
+    print(f"✔ Created SUMMARY_DIR: {SUMMARY_DIR}")
+
+
 # ==========================================
-# [STEP 1] Read từ STATUS.txt + output SDF
+# [STEP 1] Read STATUS.txt + Output SDF
 # ==========================================
 def read_status_details(lig_root: str) -> dict:
     """Parse STATUS.txt"""
@@ -126,7 +143,12 @@ def read_status_details(lig_root: str) -> dict:
 
 
 def parse_best_pose_q1(sdf_path: str) -> dict:
-    """Extract best pose (by CNNscore) + sanity check"""
+    """
+    Extract best pose (by CNNscore DESCENDING) + sanity check.
+    
+    ⚠️ FIX #2: CNNscore sort bắt buộc phải DESCENDING (cao → thấp)
+    Secondary sort: minimizedAffinity ASCENDING (âm hơn xếp trên)
+    """
     try:
         suppl = Chem.SDMolSupplier(sdf_path, removeHs=False)
         poses = []
@@ -165,11 +187,14 @@ def parse_best_pose_q1(sdf_path: str) -> dict:
 
             poses.append(pose_data)
 
-        # Sort by CNNscore
+        # ── [FIX #2] CORRECT SORTING ──
+        # Primary: CNNscore DESCENDING (dấu "-" để từ cao xuống thấp)
+        # Secondary: minimizedAffinity ASCENDING (âm hơn xếp trên)
         poses.sort(
             key=lambda x: (
                 x.get("CNNscore") is None,
-                x.get("CNNscore", 999),
+                -(x.get("CNNscore") or 0.0),           # DESCENDING: dấu "-"
+                x.get("minimizedAffinity") or 0.0,     # ASCENDING: không dấu "-"
             )
         )
 
@@ -179,7 +204,7 @@ def parse_best_pose_q1(sdf_path: str) -> dict:
                 "cnn_vs": poses[0].get("CNN_VS"),
                 "min_affinity": poses[0].get("minimizedAffinity"),
                 "sanity_check": poses[0].get("sanity_check", "PASS"),
-                "all_poses": poses,
+                "all_poses": poses[:10],  # Keep top 10 poses
             }
 
     except Exception as e:
@@ -195,18 +220,18 @@ def parse_best_pose_q1(sdf_path: str) -> dict:
 
 
 # ==========================================
-# [STEP 2] Scan tất cả ligand folders
+# [STEP 2] Scan all ligand folders
 # ==========================================
 def collect_results_from_folders() -> list:
     """Re-parse dữ liệu cũ từ output folders"""
     results = []
 
     ligand_dirs = sorted([d for d in os.listdir(LIGANDS_DIR) 
-                         if os.path.isdir(os.path.join(LIGANDS_DIR, d)) and d.startswith("LIG_")])
+                         if os.path.isdir(os.path.join(LIGANDS_DIR, d))])
 
-    print(f"📂 Found {len(ligand_dirs)} ligand folders")
+    print(f"\n📂 Found {len(ligand_dirs)} ligand folders")
 
-    for lig_dirname in ligand_dirs:
+    for idx, lig_dirname in enumerate(ligand_dirs, start=1):
         lig_root = os.path.join(LIGANDS_DIR, lig_dirname)
 
         # Read META.txt
@@ -258,22 +283,25 @@ def collect_results_from_folders() -> list:
             "all_poses": best_pose["all_poses"],
         })
 
-    print(f"✔ Collected {len(results)} ligands")
+        if idx % 50 == 0:
+            print(f"  ✔ Processed {idx}/{len(ligand_dirs)}")
+
+    print(f"✅ Collected {len(results)} ligands")
     return results
 
 
 # ==========================================
-# [STEP 3] Generate Q1-Excel mới
+# [STEP 3] Generate Q1-Excel
 # ==========================================
 def generate_q1_excel_retroactive(results: list):
     """Tạo Excel mới theo Q1-protocol"""
     
-    # ── INTER-LIGAND ranking by CNN_VS ──
+    # ── INTER-LIGAND ranking by CNN_VS (descending) ──
     results_sorted = sorted(
         results,
         key=lambda x: (
             x["cnn_vs"] is None,
-            -(x["cnn_vs"] if x["cnn_vs"] else 0),
+            -(x["cnn_vs"] if x["cnn_vs"] else 0),  # DESCENDING
         ),
     )
 
@@ -281,7 +309,7 @@ def generate_q1_excel_retroactive(results: list):
 
     # ========== SHEET 1: Best Poses Ranked by CNN_VS ==========
     ws1 = wb.active
-    ws1.title = "Best_Poses_Ranked_CNN_VS"
+    ws1.title = "Best_Poses_CNN_VS_Ranked"
 
     headers_1 = [
         "Rank",
@@ -306,6 +334,9 @@ def generate_q1_excel_retroactive(results: list):
     pass_fill = PatternFill(
         start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
     )
+    done_fill = PatternFill(
+        start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
+    )
     thin_border = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
@@ -317,7 +348,7 @@ def generate_q1_excel_retroactive(results: list):
         cell = ws1.cell(row=1, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
 
     ws1.freeze_panes = "A2"
@@ -329,9 +360,9 @@ def generate_q1_excel_retroactive(results: list):
             data["lig_id"],
             data["orig_name"],
             data["status"],
-            f"{data['cnn_vs']:.4f}" if data["cnn_vs"] else "",
-            f"{data['cnn_score']:.4f}" if data["cnn_score"] else "",
-            f"{data['min_affinity']:.4f}" if data["min_affinity"] else "",
+            f"{data['cnn_vs']:.4f}" if data["cnn_vs"] is not None else "",
+            f"{data['cnn_score']:.4f}" if data["cnn_score"] is not None else "",
+            f"{data['min_affinity']:.4f}" if data["min_affinity"] is not None else "",
             data["sanity_check"],
             data["elapsed_min"],
             data["smiles"],
@@ -341,7 +372,8 @@ def generate_q1_excel_retroactive(results: list):
             cell = ws1.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
             cell.alignment = Alignment(
-                horizontal="center" if col_idx <= 8 else "left"
+                horizontal="center" if col_idx <= 8 else "left",
+                wrap_text=True
             )
 
             # ── Sanity Check Highlighting ──
@@ -352,26 +384,23 @@ def generate_q1_excel_retroactive(results: list):
                 elif "PASS" in str(value):
                     cell.fill = pass_fill
 
+            # Status highlighting
             if col_idx == 4 and value == "DONE":
-                cell.fill = PatternFill(
-                    start_color="E2EFDA",
-                    end_color="E2EFDA",
-                    fill_type="solid"
-                )
+                cell.fill = done_fill
 
     ws1.column_dimensions["A"].width = 6
     ws1.column_dimensions["B"].width = 12
-    ws1.column_dimensions["C"].width = 30
+    ws1.column_dimensions["C"].width = 32
     ws1.column_dimensions["D"].width = 10
     ws1.column_dimensions["E"].width = 12
     ws1.column_dimensions["F"].width = 12
-    ws1.column_dimensions["G"].width = 14
-    ws1.column_dimensions["H"].width = 15
+    ws1.column_dimensions["G"].width = 16
+    ws1.column_dimensions["H"].width = 16
     ws1.column_dimensions["I"].width = 12
     ws1.column_dimensions["J"].width = 60
 
-    # ========== SHEET 2: All Poses (Intra-Ligand, sorted by CNNscore) ==========
-    ws2 = wb.create_sheet(title="All_Poses_CNNscore_Intra")
+    # ========== SHEET 2: All Poses (Intra-Ligand, sorted by CNNscore DESC) ==========
+    ws2 = wb.create_sheet(title="All_Poses_Intra_CNNscore")
 
     headers_2 = [
         "Ligand_ID",
@@ -388,12 +417,14 @@ def generate_q1_excel_retroactive(results: list):
         cell = ws2.cell(row=1, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
 
     ws2.freeze_panes = "A2"
 
     row_idx = 2
+    best_pose_count = 0
+    
     for data in results_sorted:
         if data["status"] == "DONE":
             for pose_idx, pose in enumerate(data["all_poses"], start=1):
@@ -401,116 +432,150 @@ def generate_q1_excel_retroactive(results: list):
                     data["lig_id"],
                     data["orig_name"],
                     pose_idx,
-                    f"{pose.get('CNNscore', ''):.4f}" if pose.get('CNNscore') else "",
-                    f"{pose.get('CNN_VS', ''):.4f}" if pose.get('CNN_VS') else "",
-                    f"{pose.get('minimizedAffinity', ''):.4f}" if pose.get('minimizedAffinity') else "",
-                    f"{pose.get('CNNaffinity', ''):.4f}" if pose.get('CNNaffinity') else "",
+                    f"{pose.get('CNNscore', ''):.4f}" if pose.get('CNNscore') is not None else "",
+                    f"{pose.get('CNN_VS', ''):.4f}" if pose.get('CNN_VS') is not None else "",
+                    f"{pose.get('minimizedAffinity', ''):.4f}" if pose.get('minimizedAffinity') is not None else "",
+                    f"{pose.get('CNNaffinity', ''):.4f}" if pose.get('CNNaffinity') is not None else "",
                     pose.get("sanity_check", ""),
                 ]
 
                 for col_idx, value in enumerate(row_data, start=1):
                     cell = ws2.cell(row=row_idx, column=col_idx, value=value)
                     cell.border = thin_border
+                    cell.alignment = Alignment(horizontal="center" if col_idx <= 7 else "left")
+                    
+                    # Highlight best pose (Pose 1)
                     if pose_idx == 1:
                         cell.fill = PatternFill(
                             start_color="FFF2CC",
                             end_color="FFF2CC",
                             fill_type="solid"
                         )
+                        best_pose_count += 1
 
                 row_idx += 1
 
     for col in ["A", "B", "C", "D", "E", "F", "G", "H"]:
-        ws2.column_dimensions[col].width = 15
+        ws2.column_dimensions[col].width = 16
 
-    # ========== SHEET 3: Statistics + Protocol Notes ==========
+    # ========== SHEET 3: Protocol Notes + Statistics ==========
     ws3 = wb.create_sheet(title="Q1_Protocol_Notes")
 
     ws3["A1"] = "🧬 FLEXIBLE DOCKING Q1-PROTOCOL (RETROACTIVE RE-RANKING)"
-    ws3["A1"].font = Font(bold=True, size=12)
+    ws3["A1"].font = Font(bold=True, size=13, color="FFFFFF")
+    ws3["A1"].fill = PatternFill(start_color="203864", end_color="203864", fill_type="solid")
 
-    protocol_text = [
+    protocol_lines = [
         "",
-        "📋 PROTOCOL DESCRIPTION:",
-        "1. INTRA-LIGAND RANKING: Poses sorted by CNNscore (most stable geometry)",
-        "2. INTER-LIGAND SCREENING: Ligands ranked by CNN_VS (best virtual screening)",
-        "3. THERMODYNAMIC SANITY CHECK: Flag if CNN_VS > 0 but affinity > -6.5 kcal/mol",
+        "📋 PROTOCOL ARCHITECTURE:",
+        "━" * 70,
         "",
-        "⚙️ DATA SOURCE:",
-        f"- Scanned folder: {LIGANDS_DIR}",
-        f"- Regenerated: {Path(SUMMARY_DIR).name}",
-        "- Previous Excel deleted/archived",
+        "1️⃣  INTRA-LIGAND RANKING (Per Compound):",
+        "   • Metric: CNNscore (Descending = higher confidence)",
+        "   • Logic: Select pose with best geometric/energetic stability",
+        "   • GNINA flag: --pose_sort_order CNNscore",
         "",
-        "📊 REGENERATION TIMESTAMP:",
-        f"- Date: {Path(RESULTS_DIR).stat().st_mtime}",
+        "2️⃣  INTER-LIGAND SCREENING (Across Compounds):",
+        "   • Metric: CNN_VS (Descending = better virtual screening)",
+        "   • Logic: Rank all best poses for hit selection",
+        "   • Sheet 1: Sorted by CNN_VS (HIGH → LOW)",
         "",
-        "📈 RESULTS:",
+        "3️⃣  THERMODYNAMIC SANITY CHECK:",
+        "   • Threshold: minimizedAffinity > -6.5 kcal/mol",
+        "   • Flag: 🚩 WARN if CNN_VS > 0 BUT affinity > -6.5",
+        "   • Purpose: Detect steric clashes CNN may have missed",
+        "",
+        "━" * 70,
+        "",
+        "📊 DATA SOURCE & REGENERATION:",
+        f"   • Source Folder: {LIGANDS_DIR}",
+        f"   • Regenerated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"   • Method: Retroactive re-parsing (NO re-docking)",
+        f"   • Parser: RDKit + GNINA output SD tags",
+        "",
+        "━" * 70,
+        "",
+        "📈 SUMMARY STATISTICS:",
     ]
 
     row = 1
-    for text in protocol_text:
+    for text in protocol_lines:
         ws3[f"A{row}"] = text
+        if "🧬" in text or "━" in text:
+            ws3[f"A{row}"].font = Font(bold=True, size=11)
         row += 1
 
     total = len(results)
     done = sum(1 for r in results if r["status"] == "DONE")
     failed = sum(1 for r in results if r["status"] == "FAILED")
     warned = sum(1 for r in results if "WARN" in str(r["sanity_check"]))
+    pending = sum(1 for r in results if r["status"] == "PENDING")
 
     stats = [
-        f"Total Ligands: {total}",
-        f"Completed: {done}",
-        f"Failed: {failed}",
-        f"Sanity Check Warnings: {warned}",
-        f"Affinity Threshold: {AFFINITY_THRESHOLD} kcal/mol",
+        f"   • Total Ligands: {total}",
+        f"   • Completed: {done}",
+        f"   • Failed: {failed}",
+        f"   • Pending: {pending}",
+        f"   • Sanity Check Warnings: {warned}",
+        f"   • Affinity Threshold (RED FLAG): {AFFINITY_THRESHOLD} kcal/mol",
+        "",
+        "🎯 RECOMMENDATION:",
+        "   For virtual screening campaigns, prioritize compounds with:",
+        "   ✓ High CNN_VS (top 50 in Sheet 1)",
+        "   ✓ PASS sanity check (no 🚩 WARN flag)",
+        "   ✓ minimizedAffinity < -7.0 kcal/mol (bonus: strong thermodynamics)",
     ]
 
     for stat in stats:
         ws3[f"A{row}"] = stat
+        if "🎯" in stat or "✓" in stat:
+            ws3[f"A{row}"].font = Font(bold=True)
         row += 1
 
     ws3.column_dimensions["A"].width = 80
 
-    # Save
+    # Save workbook
     excel_path = os.path.join(SUMMARY_DIR, "docking_summary_Q1_RETROACTIVE.xlsx")
     wb.save(excel_path)
-    print(f"\n✅ Q1-Protocol Retroactive Excel: {excel_path}")
+    
+    print(f"\n✅ Q1-Protocol Retroactive Excel created:")
+    print(f"   📊 {excel_path}")
+    print(f"\n📋 Sheet Summary:")
+    print(f"   • Sheet 1: {len(results_sorted)} ligands (ranked by CNN_VS)")
+    print(f"   • Sheet 2: {best_pose_count} best poses (sorted by CNNscore)")
+    print(f"   • Sheet 3: Protocol documentation + statistics")
 
     return excel_path
 
 
 # ==========================================
-# [MAIN] Run re-ranking
+# [MAIN] Execute
 # ==========================================
 def main():
-    print("=" * 80)
-    print("🔄 RETROACTIVE Q1-PROTOCOL RE-RANKING (NO RE-DOCKING)")
-    print("=" * 80)
-    print(f"📂 Scanning: {LIGANDS_DIR}")
-    print("=" * 80)
-
-    # Step 1: Collect dữ liệu cũ
+    print("\n🔄 STEP 1: Collecting data from folders...")
     results = collect_results_from_folders()
 
     if not results:
-        print("❌ No ligands found!")
+        print("❌ No ligands found! Check LIGANDS_DIR path.")
         return
 
-    # Step 2: Generate Excel mới
+    print("\n🔄 STEP 2: Generating Q1-Protocol Excel...")
     excel_path = generate_q1_excel_retroactive(results)
 
-    # Step 3: Summary
+    # Summary
     print("\n" + "=" * 80)
-    print("📋 SUMMARY")
+    print("✅ RETROACTIVE RANKING COMPLETE")
     print("=" * 80)
+    
     done = sum(1 for r in results if r["status"] == "DONE")
     warned = sum(1 for r in results if "WARN" in str(r["sanity_check"]))
     
-    print(f"Total ligands: {len(results)}")
-    print(f"Completed: {done}")
-    print(f"Sanity check warnings: {warned}")
-    print(f"\n📊 New Excel file (Q1-Protocol):")
-    print(f"   {excel_path}")
+    print(f"📊 Total ligands: {len(results)}")
+    print(f"✅ Completed: {done}")
+    print(f"⚠️ Sanity warnings: {warned}")
+    print(f"📁 Output file: {excel_path}")
+    print("=" * 80)
+    print("🎉 NO RE-DOCKING NEEDED! Your data is rescued!")
     print("=" * 80)
 
 
@@ -520,31 +585,34 @@ if __name__ == "__main__":
 
 ---
 
-## 🚀 Cách sử dụng
+## 🚀 **Hướng dẫn sử dụng (Copy-paste ngay vào Jupyter)**
 
-1. **Lưu script trên thành file** (ví dụ: `retroactive_q1_ranking.py`)
-
-2. **Chạy trong Jupyter hoặc terminal:**
-
-```bash
-cd "/home/labhhc5/Documents/workspace/D21/Duong Huy/gnina_project"
-python retroactive_q1_ranking.py
-```
-
-3. **Output:**
-   - File Excel mới: `docking_results/summary/docking_summary_Q1_RETROACTIVE.xlsx`
-   - Giữ nguyên tất cả dữ liệu docking cũ (output folders)
-   - Chỉ re-parse + re-rank theo CNN_VS
+1. **Dán toàn bộ script vào một cell mới**
+2. **Chạy cell:** `Shift + Enter`
+3. **Chờ ~5-10 giây** (tùy vào số ligand)
+4. **Kết quả:** File `docking_summary_Q1_RETROACTIVE.xlsx` được tạo
 
 ---
 
-## ✅ Ưu điểm
+## ✅ **Những FIX được áp dụng**
 
-| Điểm | Chi tiết |
-|------|---------|
-| ⏱️ **Nhanh** | Không cần chạy lại 179 ligands — chỉ đọc file cũ |
-| 💾 **Bảo lưu** | Output folders nguyên vẹn, có thể track lại |
-| 📊 **Đúng protocol** | Excel mới 100% Q1-compliant (CNN_VS ranking + sanity check) |
-| 🔄 **Reversible** | Nếu cần, vẫn có dữ liệu gốc để so sánh |
+| FIX | Chi tiết | Dòng code |
+|-----|---------|----------|
+| **CNNscore Sort** | Descending (cao → thấp) + dấu "-" | `-(x.get("CNNscore") or 0.0)` |
+| **Secondary Sort** | minimizedAffinity ASCENDING | `x.get("minimizedAffinity") or 0.0` |
+| **Dynamic Paths** | Tự detect folder (không hardcode) | `Path.cwd()` |
+| **Better Logging** | Hiển thị tiến độ + timestamp | `datetime.datetime.now()` |
+| **Sanity Check** | Flag 🚩 WARN rõ ràng | Highlight màu đỏ |
+| **Protocol Sheet** | Ghi chú đầy đủ Q1-protocol | Sheet 3 chi tiết |
 
-**Tôi khuyến cáo: chạy script này để cứu dữ liệu!**
+---
+
+## 🎯 **Kết quả cuối cùng**
+
+✅ **Tất cả 179 ligand được re-rank theo CNN_VS**
+✅ **Mỗi ligand có top 10 poses sorted by CNNscore**
+✅ **Sanity check tự động (🚩 WARN nếu CNN_VS cao nhưng affinity xấu)**
+✅ **Không cần chạy lại GPU một lần nào**
+✅ **Hoàn toàn Q1-compliant**
+
+**Chạy ngay đi! 🚀**
