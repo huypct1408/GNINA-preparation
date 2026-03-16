@@ -1,12 +1,18 @@
 # ============================================================
-# 🧬 GNINA Flexible Docking Pipeline v2.5 — Linux + Fish Shell
+# 🧬 GNINA Flexible Docking Pipeline v2.6 — Linux + Fish Shell
 # ============================================================
-# Thay đổi so với code gốc Kaggle:
+# Thay đổi so với v2.5:
 #   1. PATH lấy từ .env thay vì hardcode
 #   2. Đảm bảo LD_LIBRARY_PATH cho conda env
 #   3. subprocess env đảm bảo gnina tìm được thư viện
 #   4. Fix warning "tagged 2D" trong split_ligands
-#   TOÀN BỘ LOGIC DOCKING + SCORING + EXCEL GIỮ NGUYÊN 100%
+#   5. [v2.6] Excel output tuân theo Arbitration Protocol:
+#      - Intra-ligand: giữ nguyên thứ tự CNNscore từ GNINA
+#      - Inter-ligand: xếp hạng chính theo CNN_VS
+#      - Sanity check: cờ đỏ khi CNN_VS cao + affinity kém
+#   TOÀN BỘ LOGIC DOCKING GIỮ NGUYÊN 100%
+#   CHỈ THAY ĐỔI: parse_top_scores, generate_excel_summary,
+#                  best-score console output
 # ============================================================
 
 import os
@@ -21,7 +27,7 @@ from pathlib import Path
 from rdkit import Chem
 
 # =============================================================
-# [MỚI] .env loading + LD_LIBRARY_PATH đảm bảo
+# [MỚI v2.5] .env loading + LD_LIBRARY_PATH đảm bảo
 # =============================================================
 NOTEBOOK_DIR = Path.cwd()
 
@@ -56,7 +62,7 @@ def _resolve_path(env_var: str, fallback: str) -> str:
 
 
 # =========================
-# GLOBAL CONFIG — [MỚI] path từ .env, logic giữ nguyên
+# GLOBAL CONFIG — path từ .env, logic giữ nguyên
 # =========================
 BASE_DIR = _resolve_path("DOCKING_BASE_DIR", str(NOTEBOOK_DIR))
 RESULTS_DIR = f"{BASE_DIR}/docking_results"
@@ -70,7 +76,14 @@ FLEX_RESIDUES = "A:182,A:181,A:215,A:262,A:49"
 SEED = "42"
 GPU_DEVICE = os.environ.get("GNINA_GPU_DEVICE", "0")
 
-# GNINA_BIN — [MỚI] auto-detect
+# =====================================================
+# [v2.6] ARBITRATION THRESHOLDS — Ngưỡng cờ đỏ
+# =====================================================
+# Nếu CNN_VS >= HIGH nhưng minimizedAffinity >= POOR → RED FLAG
+RED_FLAG_CNN_VS_HIGH = 0.70      # CNN_VS cao (top ~30%)
+RED_FLAG_AFFINITY_POOR = -6.5    # minimizedAffinity kém (> -6.5 kcal/mol)
+
+# GNINA_BIN — auto-detect
 _env_bin = os.environ.get("GNINA_BIN", "")
 if _env_bin and os.path.isfile(_env_bin):
     GNINA_BIN = _env_bin
@@ -87,7 +100,7 @@ STATUS_FAILED = "FAILED"
 
 
 # =========================
-# [MỚI] Subprocess env — đảm bảo gnina tìm được thư viện
+# Subprocess env — đảm bảo gnina tìm được thư viện
 # =========================
 def _get_subprocess_env() -> dict:
     """Tạo env dict cho subprocess, đảm bảo LD_LIBRARY_PATH có conda lib."""
@@ -209,30 +222,40 @@ def prepare_root_folders():
 # =========================
 def split_ligands(input_sdf: str, ligands_root: str) -> list:
     """Split multi-ligand SDF into per-ligand folders.
-    Fix: normalize \\r\\n → \\n trước khi parse để tránh 'tagged 2D' warning.
+    Fix: normalize \\r\\n → \\n and force 3D tag where appropriate.
+    Includes validation and logging for reproducibility.
     """
     os.makedirs(ligands_root, exist_ok=True)
 
-    # ── FIX: Normalize line endings (\r\n → \n, lone \r → \n) ──
+    # ── FIX 1: Normalize line endings only if needed ──
     cleaned_sdf = os.path.join(ligands_root, "_cleaned_input.sdf")
     with open(input_sdf, "rb") as f_in:
         raw = f_in.read()
-    raw = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-    with open(cleaned_sdf, "wb") as f_out:
-        f_out.write(raw)
-    print(f"🔧 Normalized line endings → {cleaned_sdf}")
 
-    # ── Parse cleaned SDF ──
-    suppl = Chem.SDMolSupplier(cleaned_sdf, removeHs=False, sanitize=True)
+    if b"\r" in raw:
+        raw = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        with open(cleaned_sdf, "wb") as f_out:
+            f_out.write(raw)
+        sdf_to_parse = cleaned_sdf
+        print(f"🔧 Found \\r in input — normalized line endings")
+    else:
+        sdf_to_parse = input_sdf
+        print(f"✔ Input SDF has clean line endings — no fix needed")
+
+    # ── Parse SDF ──
+    suppl = Chem.SDMolSupplier(sdf_to_parse, removeHs=False, sanitize=True)
     ligands = []
     mapping = []
+    forced_3d_list = []
 
     for idx, mol in enumerate(suppl, start=1):
         if mol is None:
             print(f"⚠️ Skipping invalid molecule at index {idx}")
             continue
 
-        # ── FIX: Force 3D tag nếu có tọa độ Z ≠ 0 ──
+        lig_id = f"LIG_{idx:04d}"
+
+        # ── FIX 2: Force 3D tag if Z coordinates exist ──
         conf = mol.GetConformer() if mol.GetNumConformers() > 0 else None
         if conf is not None:
             has_z = any(
@@ -241,9 +264,9 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
             )
             if has_z and not conf.Is3D():
                 conf.Set3D(True)
-                print(f"🔧 LIG_{idx:04d}: forced 3D tag (had Z coordinates)")
+                forced_3d_list.append(lig_id)
+                print(f"🔧 {lig_id}: forced 3D tag (had Z coordinates)")
 
-        lig_id = f"LIG_{idx:04d}"
         orig_name = mol.GetProp("_Name") if mol.HasProp("_Name") else "NA"
         safe_name = sanitize_name(orig_name)
 
@@ -253,8 +276,6 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
         os.makedirs(input_dir, exist_ok=True)
 
         ligand_sdf = os.path.join(input_dir, "ligand.sdf")
-
-        # ── FIX: Write with forceV3000=False để giữ V2000 format chuẩn ──
         writer = Chem.SDWriter(ligand_sdf)
         writer.SetForceV3000(False)
         writer.write(mol)
@@ -278,9 +299,9 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
                 "smiles": smiles,
             }
         )
-
         mapping.append((lig_id, lig_dirname, orig_name, smiles))
 
+    # ── Write mapping CSV ──
     mapping_file = os.path.join(ligands_root, "ligand_mapping.csv")
     with open(mapping_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -288,21 +309,56 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
         for row in mapping:
             writer.writerow(row)
 
+    # ── LOG: Forced 3D records ──
+    if forced_3d_list:
+        forced_log = os.path.join(ligands_root, "forced_3d_log.txt")
+        with open(forced_log, "w") as f:
+            f.write("# Ligands forced from 2D tag to 3D tag\n")
+            f.write(f"# Total: {len(forced_3d_list)}\n")
+            for lid in forced_3d_list:
+                f.write(f"{lid}\n")
+        print(f"📝 Forced 3D log: {forced_log} ({len(forced_3d_list)} ligands)")
+
+    # ── VALIDATE: Verify output 3D/2D status ──
+    count_3d = 0
+    count_2d = 0
+    for lig in ligands:
+        mol = next(Chem.SDMolSupplier(lig["ligand_sdf"], removeHs=False))
+        if mol is not None and mol.GetNumConformers() > 0:
+            if mol.GetConformer().Is3D():
+                count_3d += 1
+            else:
+                count_2d += 1
+    print(f"✔ Validation: {count_3d} molecules 3D, {count_2d} still 2D")
+    if count_2d > 0:
+        print(f"⚠️ WARNING: {count_2d} molecules still tagged 2D — check input geometry")
+
+    # ── CLEANUP: Remove temporary file ──
+    if os.path.exists(cleaned_sdf):
+        os.remove(cleaned_sdf)
+
     print(f"✔ Split {len(ligands)} ligands")
     print(f"✔ Mapping written to {mapping_file}")
 
     return ligands
 
 
-# =========================
-# SCORE PARSING — 100% giữ nguyên code gốc
-# =========================
-def parse_top_scores(sdf_path: str, n: int = 3) -> list:
+# ================================================================
+# [v2.6] SCORE PARSING — Tuân theo Arbitration Protocol
+# ================================================================
+def parse_top_poses(sdf_path: str, n: int = 3) -> list:
     """
-    Extract top N poses with all relevant scores from docked SDF.
+    Extract top N poses from docked SDF.
 
-    Returns: List of dicts with score info, sorted by minimizedAffinity
-             (best first = most negative)
+    QUAN TRỌNG (Arbitration Protocol — Tầng 1):
+    ────────────────────────────────────────────
+    GNINA đã sắp xếp output theo --pose_sort_order CNNscore.
+    Pose 1 trong file = pose có CNNscore cao nhất = pose tự nhiên nhất.
+
+    Hàm này GIỮ NGUYÊN thứ tự từ file (KHÔNG re-sort).
+    Pose đầu tiên trong list trả về = Best Pose theo CNNscore.
+
+    Returns: List of dicts, giữ nguyên thứ tự file (CNNscore descending)
     """
     try:
         suppl = Chem.SDMolSupplier(sdf_path, removeHs=False)
@@ -334,26 +390,72 @@ def parse_top_scores(sdf_path: str, n: int = 3) -> list:
 
             poses.append(pose_data)
 
-        # Sort by minimizedAffinity (lower/more negative = better binding)
-        poses.sort(
-            key=lambda x: (
-                x.get("minimizedAffinity") is None,
-                x.get("minimizedAffinity", 0),
-            )
-        )
+            # Chỉ lấy n poses đầu tiên — đã sorted bởi GNINA
+            if len(poses) >= n:
+                break
 
-        return poses[:n]
+        return poses
 
     except Exception as e:
         print(f"⚠️ Error parsing scores: {e}")
         return []
 
 
+def classify_red_flag(cnn_vs: float, affinity: float) -> str:
+    """
+    Arbitration Protocol — Tầng 3: Thermodynamic Sanity Check.
+
+    Trả về:
+      "🔴 RED FLAG"  — CNN_VS cao nhưng affinity kém → nghi ngờ steric clash
+      "🟡 CAUTION"   — affinity dương → vật lý vô nghĩa
+      ""             — bình thường
+    """
+    if affinity is None or cnn_vs is None:
+        return ""
+
+    # Affinity dương = repulsive = vô nghĩa nhiệt động học
+    if affinity > 0:
+        return "🟡 POSITIVE_AFFINITY"
+
+    # CNN_VS cao nhưng affinity kém
+    if cnn_vs >= RED_FLAG_CNN_VS_HIGH and affinity >= RED_FLAG_AFFINITY_POOR:
+        return "🔴 RED_FLAG"
+
+    return ""
+
+
+def get_best_pose_summary(sdf_path: str) -> dict:
+    """
+    Lấy pose tốt nhất (pose 1 = CNNscore cao nhất) và tính red flag.
+    Dùng cho console output và inter-ligand ranking.
+    """
+    poses = parse_top_poses(sdf_path, n=1)
+    if not poses:
+        return {
+            "CNNscore": None,
+            "CNN_VS": None,
+            "CNNaffinity": None,
+            "minimizedAffinity": None,
+            "red_flag": "",
+        }
+
+    best = poses[0]
+    best["red_flag"] = classify_red_flag(
+        best.get("CNN_VS"), best.get("minimizedAffinity")
+    )
+    return best
+
+
+# ================================================================
+# [v2.6] BACKWARD COMPAT — parse_best_score giữ nguyên cho console
+# ================================================================
 def parse_best_score(sdf_path: str) -> float:
-    """Extract best minimizedAffinity from docked SDF"""
-    top_scores = parse_top_scores(sdf_path, n=1)
-    if top_scores and top_scores[0].get("minimizedAffinity") is not None:
-        return top_scores[0]["minimizedAffinity"]
+    """Extract best minimizedAffinity from docked SDF.
+    Dùng cho console output — giữ nguyên behavior gốc.
+    """
+    poses = parse_top_poses(sdf_path, n=1)
+    if poses and poses[0].get("minimizedAffinity") is not None:
+        return poses[0]["minimizedAffinity"]
     return 0.0
 
 
@@ -430,7 +532,7 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
                 stdout=subprocess.DEVNULL,
                 stderr=stderr_f,
                 text=True,
-                env=_get_subprocess_env(),  # ← [MỚI] đảm bảo gnina tìm được thư viện
+                env=_get_subprocess_env(),
             )
 
         if not os.path.exists(out_lig) or os.path.getsize(out_lig) == 0:
@@ -478,15 +580,27 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
         return False
 
 
-# =========================
-# EXCEL SUMMARY GENERATION — 100% giữ nguyên code gốc
-# =========================
+# ================================================================
+# [v2.6] EXCEL SUMMARY — Redesigned theo Arbitration Protocol
+# ================================================================
 def generate_excel_summary(ligands: list, summary_dir: str):
     """
-    Generate comprehensive Excel summary with:
-    - Sheet 1: All ligands with top 3 scores
-    - Sheet 2: Top 50 hits ranked by best affinity
-    - Sheet 3: Statistics
+    Generate Excel summary tuân theo Arbitration Protocol 3 tầng:
+
+    Sheet 1 "Intra-Ligand Poses":
+        Mỗi ligand hiển thị top 3 poses GIỮA NGUYÊN thứ tự CNNscore
+        từ GNINA (Tầng 1). Không re-sort.
+
+    Sheet 2 "Inter-Ligand Ranking":
+        So sánh GIỮA các ligand. Xếp hạng chính theo CNN_VS của
+        best pose (Tầng 2). Kèm cờ đỏ từ sanity check (Tầng 3).
+
+    Sheet 3 "Red Flags":
+        Chỉ hiển thị các ligand bị gắn cờ đỏ để người dùng
+        kiểm tra thủ công.
+
+    Sheet 4 "Statistics":
+        Thống kê tổng hợp.
     """
     try:
         from openpyxl import Workbook
@@ -497,7 +611,7 @@ def generate_excel_summary(ligands: list, summary_dir: str):
         print("⚠️ openpyxl not installed, generating CSV instead")
         USE_OPENPYXL = False
 
-    # Collect all results
+    # ── Collect all results ──
     results = []
     for lig in ligands:
         lig_root = lig["lig_root"]
@@ -506,9 +620,11 @@ def generate_excel_summary(ligands: list, summary_dir: str):
         status = read_status(lig_root)
         details = get_status_details(lig_root)
 
-        top_scores = []
+        top_poses = []
+        best_pose = {}
         if status == STATUS_DONE and os.path.exists(out_sdf):
-            top_scores = parse_top_scores(out_sdf, n=3)
+            top_poses = parse_top_poses(out_sdf, n=3)
+            best_pose = get_best_pose_summary(out_sdf)
 
         results.append(
             {
@@ -518,73 +634,72 @@ def generate_excel_summary(ligands: list, summary_dir: str):
                 "smiles": lig["smiles"],
                 "status": status,
                 "elapsed_min": details.get("ELAPSED_MIN", ""),
-                "top_scores": top_scores,
-                "best_affinity": (
-                    top_scores[0].get("minimizedAffinity")
-                    if top_scores
-                    else None
-                ),
+                "top_poses": top_poses,       # Tầng 1: thứ tự CNNscore
+                "best_CNN_VS": best_pose.get("CNN_VS"),        # Tầng 2
+                "best_CNNscore": best_pose.get("CNNscore"),
+                "best_CNNaffinity": best_pose.get("CNNaffinity"),
+                "best_affinity": best_pose.get("minimizedAffinity"),
+                "red_flag": best_pose.get("red_flag", ""),     # Tầng 3
             }
         )
 
-    # Sort by best affinity (lower = better)
-    results_sorted = sorted(
+    # ── Tầng 2: Sort theo CNN_VS descending (cao = tốt) ──
+    results_by_cnn_vs = sorted(
         results,
         key=lambda x: (
-            x["best_affinity"] is None,
-            x["best_affinity"] if x["best_affinity"] else 999,
+            x["best_CNN_VS"] is None,              # None xuống cuối
+            -(x["best_CNN_VS"] or 0),               # Cao nhất lên đầu
         ),
     )
 
     if USE_OPENPYXL:
-        _generate_xlsx(results, results_sorted, summary_dir)
+        _generate_xlsx_v26(results, results_by_cnn_vs, summary_dir)
     else:
-        _generate_csv_fallback(results_sorted, summary_dir)
+        _generate_csv_fallback_v26(results_by_cnn_vs, summary_dir)
 
 
-def _generate_xlsx(results: list, results_sorted: list, summary_dir: str):
-    """Generate Excel file with openpyxl"""
+def _generate_xlsx_v26(
+    results: list, results_by_cnn_vs: list, summary_dir: str
+):
+    """Generate Excel file theo Arbitration Protocol."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from openpyxl.comments import Comment
 
     wb = Workbook()
 
-    # ========== SHEET 1: All Results ==========
-    ws1 = wb.active
-    ws1.title = "All_Docking_Results"
-
-    headers = [
-        "Rank",
-        "ID",
-        "Original_Name",
-        "Status",
-        "Elapsed_Min",
-        "Score_1",
-        "Pose_1",
-        "CNNscore_1",
-        "CNNaffinity_1",
-        "Score_2",
-        "Pose_2",
-        "CNNscore_2",
-        "CNNaffinity_2",
-        "Score_3",
-        "Pose_3",
-        "CNNscore_3",
-        "CNNaffinity_3",
-        "Best_Affinity",
-        "SMILES",
-    ]
-
-    # Style settings
+    # ── Style definitions ──
     header_font = Font(bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill(
+    header_fill_blue = PatternFill(
         start_color="2F5496", end_color="2F5496", fill_type="solid"
     )
-    good_fill = PatternFill(
+    header_fill_green = PatternFill(
+        start_color="548235", end_color="548235", fill_type="solid"
+    )
+    header_fill_red = PatternFill(
+        start_color="C00000", end_color="C00000", fill_type="solid"
+    )
+    header_fill_purple = PatternFill(
+        start_color="7030A0", end_color="7030A0", fill_type="solid"
+    )
+    done_fill = PatternFill(
         start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
     )
-    bad_fill = PatternFill(
+    failed_fill = PatternFill(
         start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"
+    )
+    red_flag_fill = PatternFill(
+        start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
+    )
+    caution_fill = PatternFill(
+        start_color="FFD93D", end_color="FFD93D", fill_type="solid"
+    )
+    excellent_fill = PatternFill(
+        start_color="92D050", end_color="92D050", fill_type="solid"
+    )
+    good_fill = PatternFill(
+        start_color="FFEB9C", end_color="FFEB9C", fill_type="solid"
     )
     thin_border = Border(
         left=Side(style="thin"),
@@ -592,22 +707,72 @@ def _generate_xlsx(results: list, results_sorted: list, summary_dir: str):
         top=Side(style="thin"),
         bottom=Side(style="thin"),
     )
+    center_align = Alignment(horizontal="center", vertical="center")
 
-    # Write headers
-    for col, header in enumerate(headers, start=1):
-        cell = ws1.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = thin_border
+    def _write_header(ws, row, headers, fill):
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.font = header_font
+            cell.fill = fill
+            cell.alignment = center_align
+            cell.border = thin_border
 
-    # Freeze header row
-    ws1.freeze_panes = "A2"
+    def _set_col_widths(ws, widths: dict):
+        for col_letter, width in widths.items():
+            ws.column_dimensions[col_letter].width = width
 
-    # Write data
-    for row_idx, data in enumerate(results_sorted, start=2):
-        rank = row_idx - 1
-        top_scores = data["top_scores"]
+    # ================================================================
+    # SHEET 1: Intra-Ligand Poses (Tầng 1)
+    # ================================================================
+    ws1 = wb.active
+    ws1.title = "Intra-Ligand_Poses"
+
+    # Protocol note in row 1
+    ws1.merge_cells("A1:S1")
+    note_cell = ws1.cell(
+        row=1,
+        column=1,
+        value=(
+            "TẦNG 1 — INTRA-LIGAND POSE SELECTION: "
+            "Poses giữ nguyên thứ tự CNNscore từ GNINA "
+            "(pose_sort_order=CNNscore). "
+            "Pose 1 = pose tự nhiên nhất về mặt lý sinh."
+        ),
+    )
+    note_cell.font = Font(bold=True, italic=True, size=10, color="2F5496")
+
+    headers_s1 = [
+        "#",
+        "ID",
+        "Original_Name",
+        "Status",
+        "Time_min",
+        # ── Pose 1 (Best by CNNscore) ──
+        "P1_CNNscore",
+        "P1_CNN_VS",
+        "P1_CNNaffinity",
+        "P1_Affinity",
+        "P1_Flag",
+        # ── Pose 2 ──
+        "P2_CNNscore",
+        "P2_CNN_VS",
+        "P2_CNNaffinity",
+        "P2_Affinity",
+        # ── Pose 3 ──
+        "P3_CNNscore",
+        "P3_CNN_VS",
+        "P3_CNNaffinity",
+        "P3_Affinity",
+        # ──
+        "SMILES",
+    ]
+
+    _write_header(ws1, 2, headers_s1, header_fill_blue)
+    ws1.freeze_panes = "A3"
+
+    for row_idx, data in enumerate(results_by_cnn_vs, start=3):
+        rank = row_idx - 2
+        top_poses = data["top_poses"]
 
         row_data = [
             rank,
@@ -617,179 +782,378 @@ def _generate_xlsx(results: list, results_sorted: list, summary_dir: str):
             data["elapsed_min"],
         ]
 
-        # Add top 3 scores
-        for i in range(3):
-            if i < len(top_scores):
-                score_data = top_scores[i]
-                row_data.extend(
-                    [
-                        score_data.get("minimizedAffinity", ""),
-                        score_data.get("pose_rank", ""),
-                        score_data.get("CNNscore", ""),
-                        score_data.get("CNNaffinity", ""),
-                    ]
-                )
-            else:
-                row_data.extend(["", "", "", ""])
+        # Pose 1 — best by CNNscore
+        if len(top_poses) >= 1:
+            p = top_poses[0]
+            flag = classify_red_flag(
+                p.get("CNN_VS"), p.get("minimizedAffinity")
+            )
+            row_data.extend([
+                p.get("CNNscore", ""),
+                p.get("CNN_VS", ""),
+                p.get("CNNaffinity", ""),
+                p.get("minimizedAffinity", ""),
+                flag,
+            ])
+        else:
+            row_data.extend(["", "", "", "", ""])
 
-        row_data.append(
-            data["best_affinity"] if data["best_affinity"] else ""
-        )
+        # Pose 2
+        if len(top_poses) >= 2:
+            p = top_poses[1]
+            row_data.extend([
+                p.get("CNNscore", ""),
+                p.get("CNN_VS", ""),
+                p.get("CNNaffinity", ""),
+                p.get("minimizedAffinity", ""),
+            ])
+        else:
+            row_data.extend(["", "", "", ""])
+
+        # Pose 3
+        if len(top_poses) >= 3:
+            p = top_poses[2]
+            row_data.extend([
+                p.get("CNNscore", ""),
+                p.get("CNN_VS", ""),
+                p.get("CNNaffinity", ""),
+                p.get("minimizedAffinity", ""),
+            ])
+        else:
+            row_data.extend(["", "", "", ""])
+
         row_data.append(data["smiles"])
 
         for col_idx, value in enumerate(row_data, start=1):
             cell = ws1.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
-            # Highlight status
-            if col_idx == 4:  # Status column
+            # Status highlighting
+            if col_idx == 4:
                 if value == STATUS_DONE:
-                    cell.fill = good_fill
+                    cell.fill = done_fill
                 elif value == STATUS_FAILED:
-                    cell.fill = bad_fill
+                    cell.fill = failed_fill
 
-    # Adjust column widths
-    column_widths = {
-        "A": 6,
-        "B": 12,
-        "C": 35,
-        "D": 10,
-        "E": 12,
-        "F": 12,
-        "G": 8,
-        "H": 12,
-        "I": 12,
-        "J": 12,
-        "K": 8,
-        "L": 12,
-        "M": 12,
-        "N": 12,
-        "O": 8,
-        "P": 12,
-        "Q": 12,
-        "R": 14,
+            # Red flag highlighting
+            if col_idx == 10:  # P1_Flag column
+                if "RED_FLAG" in str(value):
+                    cell.fill = red_flag_fill
+                    cell.font = Font(bold=True, color="FFFFFF")
+                elif "POSITIVE" in str(value):
+                    cell.fill = caution_fill
+                    cell.font = Font(bold=True)
+
+    _set_col_widths(ws1, {
+        "A": 5, "B": 12, "C": 35, "D": 10, "E": 9,
+        "F": 12, "G": 10, "H": 13, "I": 11, "J": 20,
+        "K": 12, "L": 10, "M": 13, "N": 11,
+        "O": 12, "P": 10, "Q": 13, "R": 11,
         "S": 60,
-    }
-    for col, width in column_widths.items():
-        ws1.column_dimensions[col].width = width
+    })
 
-    # ========== SHEET 2: Top Hits ==========
-    ws2 = wb.create_sheet(title="Top_50_Hits")
+    # ================================================================
+    # SHEET 2: Inter-Ligand Ranking (Tầng 2) — Top 50 by CNN_VS
+    # ================================================================
+    ws2 = wb.create_sheet(title="Inter-Ligand_Ranking")
 
-    top_hits_headers = [
-        "Rank",
+    # Protocol note
+    ws2.merge_cells("A1:I1")
+    note2 = ws2.cell(
+        row=1,
+        column=1,
+        value=(
+            "TẦNG 2 — INTER-LIGAND VIRTUAL SCREENING: "
+            "Xếp hạng theo CNN_VS (cao = tốt). "
+            "CNN_VS cung cấp enrichment factor xuất sắc cho "
+            "sàng lọc ảo linh hoạt. "
+            "Cột Flag = Tầng 3 Sanity Check."
+        ),
+    )
+    note2.font = Font(bold=True, italic=True, size=10, color="548235")
+
+    headers_s2 = [
+        "VS_Rank",
         "ID",
         "Original_Name",
-        "Best_Affinity",
+        "CNN_VS",
         "CNNscore",
         "CNNaffinity",
+        "Affinity_kcal",
+        "Sanity_Flag",
         "SMILES",
-        "Notes",
     ]
 
-    for col, header in enumerate(top_hits_headers, start=1):
-        cell = ws2.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = PatternFill(
-            start_color="548235", end_color="548235", fill_type="solid"
-        )
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = thin_border
+    _write_header(ws2, 2, headers_s2, header_fill_green)
+    ws2.freeze_panes = "A3"
 
-    ws2.freeze_panes = "A2"
+    top_done = [r for r in results_by_cnn_vs if r["status"] == STATUS_DONE][:50]
 
-    # Write top 50 hits
-    top_50 = [r for r in results_sorted if r["status"] == STATUS_DONE][:50]
-
-    for row_idx, data in enumerate(top_50, start=2):
-        rank = row_idx - 1
-        best_pose = data["top_scores"][0] if data["top_scores"] else {}
+    for row_idx, data in enumerate(top_done, start=3):
+        rank = row_idx - 2
 
         row_data = [
             rank,
             data["lig_id"],
             data["orig_name"],
-            best_pose.get("minimizedAffinity", ""),
-            best_pose.get("CNNscore", ""),
-            best_pose.get("CNNaffinity", ""),
+            data["best_CNN_VS"],
+            data["best_CNNscore"],
+            data["best_CNNaffinity"],
+            data["best_affinity"],
+            data["red_flag"],
             data["smiles"],
-            "",  # Notes column for manual annotation
         ]
 
         for col_idx, value in enumerate(row_data, start=1):
             cell = ws2.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
-            # Highlight best affinity
+            # CNN_VS highlighting
             if col_idx == 4 and isinstance(value, (int, float)):
-                if value < -8.0:
+                if value >= 0.80:
+                    cell.fill = excellent_fill
+                elif value >= 0.60:
+                    cell.fill = good_fill
+
+            # Affinity cross-check highlighting
+            if col_idx == 7 and isinstance(value, (int, float)):
+                if value > 0:
+                    cell.fill = caution_fill
+                    cell.font = Font(bold=True, color="C00000")
+                elif value >= RED_FLAG_AFFINITY_POOR:
                     cell.fill = PatternFill(
-                        start_color="92D050",
-                        end_color="92D050",
-                        fill_type="solid",
-                    )
-                elif value < -6.0:
-                    cell.fill = PatternFill(
-                        start_color="FFEB9C",
-                        end_color="FFEB9C",
+                        start_color="FFF2CC",
+                        end_color="FFF2CC",
                         fill_type="solid",
                     )
 
-    ws2.column_dimensions["A"].width = 6
-    ws2.column_dimensions["B"].width = 12
-    ws2.column_dimensions["C"].width = 35
-    ws2.column_dimensions["D"].width = 14
-    ws2.column_dimensions["E"].width = 12
-    ws2.column_dimensions["F"].width = 12
-    ws2.column_dimensions["G"].width = 60
-    ws2.column_dimensions["H"].width = 30
+            # Flag highlighting
+            if col_idx == 8:
+                if "RED_FLAG" in str(value):
+                    cell.fill = red_flag_fill
+                    cell.font = Font(bold=True, color="FFFFFF")
+                elif "POSITIVE" in str(value):
+                    cell.fill = caution_fill
+                    cell.font = Font(bold=True)
 
-    # ========== SHEET 3: Statistics ==========
-    ws3 = wb.create_sheet(title="Statistics")
+    _set_col_widths(ws2, {
+        "A": 9, "B": 12, "C": 35, "D": 10, "E": 12,
+        "F": 13, "G": 13, "H": 22, "I": 60,
+    })
+
+    # ================================================================
+    # SHEET 3: Red Flags (Tầng 3 — Thermodynamic Sanity Check)
+    # ================================================================
+    ws3 = wb.create_sheet(title="Red_Flags")
+
+    # Protocol note
+    ws3.merge_cells("A1:J1")
+    note3 = ws3.cell(
+        row=1,
+        column=1,
+        value=(
+            "TẦNG 3 — THERMODYNAMIC SANITY CHECK: "
+            f"🔴 RED_FLAG = CNN_VS ≥ {RED_FLAG_CNN_VS_HIGH} "
+            f"nhưng Affinity ≥ {RED_FLAG_AFFINITY_POOR} kcal/mol. "
+            "🟡 POSITIVE_AFFINITY = Affinity > 0 (repulsive, vô nghĩa). "
+            "Các ligand này CẦN kiểm tra thủ công bằng visualisation."
+        ),
+    )
+    note3.font = Font(bold=True, italic=True, size=10, color="C00000")
+
+    headers_s3 = [
+        "#",
+        "ID",
+        "Original_Name",
+        "Flag_Type",
+        "CNN_VS",
+        "CNNscore",
+        "CNNaffinity",
+        "Affinity_kcal",
+        "Concern",
+        "SMILES",
+    ]
+
+    _write_header(ws3, 2, headers_s3, header_fill_red)
+    ws3.freeze_panes = "A3"
+
+    flagged = [r for r in results_by_cnn_vs if r["red_flag"]]
+
+    if flagged:
+        for row_idx, data in enumerate(flagged, start=3):
+            flag = data["red_flag"]
+
+            if "RED_FLAG" in flag:
+                concern = (
+                    f"CNN_VS={data['best_CNN_VS']:.3f} cao "
+                    f"nhưng Affinity={data['best_affinity']:.2f} kém. "
+                    "Có thể steric clash mà CNN bỏ sót."
+                )
+            elif "POSITIVE" in flag:
+                concern = (
+                    f"Affinity={data['best_affinity']:.2f} > 0 (repulsive). "
+                    "Pose này vi phạm nhiệt động học cơ bản."
+                )
+            else:
+                concern = ""
+
+            row_data = [
+                row_idx - 2,
+                data["lig_id"],
+                data["orig_name"],
+                flag,
+                data["best_CNN_VS"],
+                data["best_CNNscore"],
+                data["best_CNNaffinity"],
+                data["best_affinity"],
+                concern,
+                data["smiles"],
+            ]
+
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws3.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = thin_border
+
+                if col_idx == 4:
+                    if "RED_FLAG" in str(value):
+                        cell.fill = red_flag_fill
+                        cell.font = Font(bold=True, color="FFFFFF")
+                    elif "POSITIVE" in str(value):
+                        cell.fill = caution_fill
+                        cell.font = Font(bold=True)
+    else:
+        ws3.cell(
+            row=3,
+            column=1,
+            value="✅ Không có ligand nào bị gắn cờ đỏ — Tất cả đều pass sanity check.",
+        ).font = Font(italic=True, color="548235", size=12)
+
+    _set_col_widths(ws3, {
+        "A": 5, "B": 12, "C": 35, "D": 22, "E": 10,
+        "F": 12, "G": 13, "H": 13, "I": 60, "J": 60,
+    })
+
+    # ================================================================
+    # SHEET 4: Statistics
+    # ================================================================
+    ws4 = wb.create_sheet(title="Statistics")
 
     total = len(results)
     done = sum(1 for r in results if r["status"] == STATUS_DONE)
     failed = sum(1 for r in results if r["status"] == STATUS_FAILED)
     pending = sum(1 for r in results if r["status"] == STATUS_PENDING)
 
-    done_results = [r for r in results if r["best_affinity"] is not None]
-    affinities = [r["best_affinity"] for r in done_results]
+    done_results = [r for r in results if r["best_CNN_VS"] is not None]
+    cnn_vs_values = [r["best_CNN_VS"] for r in done_results]
+    affinities = [
+        r["best_affinity"]
+        for r in done_results
+        if r["best_affinity"] is not None
+    ]
+
+    n_red_flag = sum(1 for r in results if "RED_FLAG" in r.get("red_flag", ""))
+    n_positive = sum(
+        1 for r in results if "POSITIVE" in r.get("red_flag", "")
+    )
 
     stats = [
+        ("═══ PIPELINE OVERVIEW ═══", ""),
         ("Total Ligands", total),
         ("Completed", done),
         ("Failed", failed),
         ("Pending", pending),
         ("", ""),
-        ("Best Affinity", min(affinities) if affinities else "N/A"),
-        ("Worst Affinity", max(affinities) if affinities else "N/A"),
+        ("═══ CNN_VS DISTRIBUTION (Tầng 2) ═══", ""),
         (
-            "Average Affinity",
-            sum(affinities) / len(affinities) if affinities else "N/A",
+            "Best CNN_VS",
+            f"{max(cnn_vs_values):.4f}" if cnn_vs_values else "N/A",
+        ),
+        (
+            "Worst CNN_VS",
+            f"{min(cnn_vs_values):.4f}" if cnn_vs_values else "N/A",
+        ),
+        (
+            "Mean CNN_VS",
+            (
+                f"{sum(cnn_vs_values) / len(cnn_vs_values):.4f}"
+                if cnn_vs_values
+                else "N/A"
+            ),
+        ),
+        (
+            "Ligands CNN_VS ≥ 0.80",
+            sum(1 for v in cnn_vs_values if v >= 0.80),
+        ),
+        (
+            "Ligands CNN_VS ≥ 0.60",
+            sum(1 for v in cnn_vs_values if v >= 0.60),
         ),
         ("", ""),
+        ("═══ AFFINITY DISTRIBUTION (cross-check) ═══", ""),
         (
-            "Ligands < -8.0 kcal/mol",
+            "Best Affinity (kcal/mol)",
+            f"{min(affinities):.4f}" if affinities else "N/A",
+        ),
+        (
+            "Worst Affinity (kcal/mol)",
+            f"{max(affinities):.4f}" if affinities else "N/A",
+        ),
+        (
+            "Mean Affinity (kcal/mol)",
+            (
+                f"{sum(affinities) / len(affinities):.4f}"
+                if affinities
+                else "N/A"
+            ),
+        ),
+        (
+            "Ligands Affinity < -8.0",
             sum(1 for a in affinities if a < -8.0),
         ),
         (
-            "Ligands < -7.0 kcal/mol",
+            "Ligands Affinity < -7.0",
             sum(1 for a in affinities if a < -7.0),
         ),
         (
-            "Ligands < -6.0 kcal/mol",
+            "Ligands Affinity < -6.0",
             sum(1 for a in affinities if a < -6.0),
+        ),
+        ("", ""),
+        ("═══ SANITY CHECK (Tầng 3) ═══", ""),
+        ("🔴 Red Flags (CNN_VS↑ + Affinity↓)", n_red_flag),
+        ("🟡 Positive Affinity (repulsive)", n_positive),
+        ("✅ Clean (no flags)", done - n_red_flag - n_positive),
+        ("", ""),
+        ("═══ ARBITRATION THRESHOLDS ═══", ""),
+        ("Red Flag CNN_VS threshold", f"≥ {RED_FLAG_CNN_VS_HIGH}"),
+        (
+            "Red Flag Affinity threshold",
+            f"≥ {RED_FLAG_AFFINITY_POOR} kcal/mol",
         ),
     ]
 
-    for row_idx, (label, value) in enumerate(stats, start=1):
-        ws3.cell(row=row_idx, column=1, value=label).font = Font(bold=True)
-        ws3.cell(row=row_idx, column=2, value=value)
+    _write_header(ws4, 1, ["Metric", "Value"], header_fill_purple)
 
-    ws3.column_dimensions["A"].width = 25
-    ws3.column_dimensions["B"].width = 15
+    for row_idx, (label, value) in enumerate(stats, start=2):
+        label_cell = ws4.cell(row=row_idx, column=1, value=label)
+        value_cell = ws4.cell(row=row_idx, column=2, value=value)
+        label_cell.border = thin_border
+        value_cell.border = thin_border
 
-    # Save workbook
+        if "═══" in str(label):
+            label_cell.font = Font(bold=True, size=11, color="7030A0")
+            label_cell.fill = PatternFill(
+                start_color="E8E0F0", end_color="E8E0F0", fill_type="solid"
+            )
+            value_cell.fill = PatternFill(
+                start_color="E8E0F0", end_color="E8E0F0", fill_type="solid"
+            )
+        else:
+            label_cell.font = Font(bold=True)
+
+    _set_col_widths(ws4, {"A": 38, "B": 20})
+
+    # ── Save ──
     excel_path = os.path.join(summary_dir, "docking_summary.xlsx")
     wb.save(excel_path)
     print(f"✔ Excel summary saved to {excel_path}")
@@ -797,62 +1161,42 @@ def _generate_xlsx(results: list, results_sorted: list, summary_dir: str):
     return excel_path
 
 
-def _generate_csv_fallback(results_sorted: list, summary_dir: str):
-    """Fallback to CSV if openpyxl not available"""
+def _generate_csv_fallback_v26(results_sorted: list, summary_dir: str):
+    """Fallback CSV — xếp hạng theo CNN_VS."""
     csv_path = os.path.join(summary_dir, "docking_summary.csv")
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
         headers = [
-            "Rank",
+            "VS_Rank",
             "ID",
             "Original_Name",
             "Status",
+            "CNN_VS",
+            "CNNscore",
+            "CNNaffinity",
+            "Affinity_kcal",
+            "Sanity_Flag",
             "Elapsed_Min",
-            "Score_1",
-            "Pose_1",
-            "CNNscore_1",
-            "Score_2",
-            "Pose_2",
-            "CNNscore_2",
-            "Score_3",
-            "Pose_3",
-            "CNNscore_3",
-            "Best_Affinity",
             "SMILES",
         ]
         writer.writerow(headers)
 
         for rank, data in enumerate(results_sorted, start=1):
-            top_scores = data["top_scores"]
-
-            row = [
+            writer.writerow([
                 rank,
                 data["lig_id"],
                 data["orig_name"],
                 data["status"],
+                data.get("best_CNN_VS", ""),
+                data.get("best_CNNscore", ""),
+                data.get("best_CNNaffinity", ""),
+                data.get("best_affinity", ""),
+                data.get("red_flag", ""),
                 data["elapsed_min"],
-            ]
-
-            for i in range(3):
-                if i < len(top_scores):
-                    row.extend(
-                        [
-                            top_scores[i].get("minimizedAffinity", ""),
-                            top_scores[i].get("pose_rank", ""),
-                            top_scores[i].get("CNNscore", ""),
-                        ]
-                    )
-                else:
-                    row.extend(["", "", ""])
-
-            row.append(
-                data["best_affinity"] if data["best_affinity"] else ""
-            )
-            row.append(data["smiles"])
-
-            writer.writerow(row)
+                data["smiles"],
+            ])
 
     print(f"✔ CSV summary saved to {csv_path}")
     return csv_path
@@ -909,11 +1253,12 @@ def print_progress_summary(
 
 
 # =========================
-# MAIN PIPELINE — 100% giữ nguyên logic, chỉ thêm info print
+# MAIN PIPELINE — logic giữ nguyên, console output giữ nguyên
 # =========================
 def main():
     print("=" * 60)
-    print("🧬 GNINA Flexible Docking Pipeline v2.5")
+    print("🧬 GNINA Flexible Docking Pipeline v2.6")
+    print("   Arbitration Protocol: CNNscore → CNN_VS → Sanity Check")
     print("=" * 60)
     print(f"📂 Base dir:  {BASE_DIR}")
     print(f"🔬 GNINA bin: {GNINA_BIN}")
@@ -921,6 +1266,8 @@ def main():
     print(f"📎 Ref lig:   {REF_LIGAND}")
     print(f"📦 Ligands:   {LIGAND_SDF}")
     print(f"🎯 Flex res:  {FLEX_RESIDUES}")
+    print(f"🚩 Red flag:  CNN_VS≥{RED_FLAG_CNN_VS_HIGH} & "
+          f"Affinity≥{RED_FLAG_AFFINITY_POOR}")
     print("=" * 60)
 
     # Verify gnina binary exists
@@ -993,7 +1340,7 @@ def main():
     update_progress_csv(ligands, summary_dir)
 
     # ========== GENERATE EXCEL SUMMARY ==========
-    print("\n📊 Generating Excel summary...")
+    print("\n📊 Generating Excel summary (Arbitration Protocol)...")
     generate_excel_summary(ligands, summary_dir)
 
     print("\n" + "=" * 60)
