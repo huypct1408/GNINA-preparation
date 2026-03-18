@@ -1,6 +1,6 @@
 Folder này lựa chọn các flexible residue cho các protein
 
-**1. PPARA (7BQ2, PPARa Ligand-Binding Domain Structures with Endogenous Fatty Acids and Fibrates)** `--flexres A:273,A:279`
+# **1. PPARA (7BQ2, PPARa Ligand-Binding Domain Structures with Endogenous Fatty Acids and Fibrates)** `--flexres A:273,A:279`
 
 Molecular docking of massive, highly selective fibrates into the peroxisome proliferator-activated receptor alpha (PPAR$\alpha$) presents a severe geometric paradox. The receptor possesses an abnormally massive 1,100 Å³ binding cavity composed of multiple branching arms, meaning unrestricted flexibility will trigger an immediate exponential explosion of the Monte Carlo search space and destroy the active conformation. 
 
@@ -34,7 +34,7 @@ Implement the mandatory flexible residues strictly as:
 `--flexres A:273,A:279`
 You must maintain absolute rigidity for the S280/Y314/H440/Y464 acid anchor and the entire Chain B SRC1 peptide. This directive leaves zero residual ambiguity in the defined search space, establishing a mathematically optimal grid for induced-fit docking in GNINA.
 
-**2. MMP2 (7XJO, Discovery of Aryloxyphenyl−Heptapeptide Hybrids as Potent and Selective Matrix Metalloproteinase‑2 Inhibitors for the Treatment of Idiopathic Pulmonary Fibrosis)** `Arg7, Leu83, and Glu130`
+# **2. MMP2 (7XJO, Discovery of Aryloxyphenyl−Heptapeptide Hybrids as Potent and Selective Matrix Metalloproteinase‑2 Inhibitors for the Treatment of Idiopathic Pulmonary Fibrosis)** `Arg7, Leu83, and Glu130`
 
 Molecular docking of massive hybrid inhibitors into metalloproteinases presents a rigid geometric paradox. The receptor must adapt to bulky moieties without shattering the catalytic coordination sphere. 
 
