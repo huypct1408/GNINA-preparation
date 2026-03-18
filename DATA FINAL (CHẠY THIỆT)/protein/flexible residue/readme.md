@@ -1,6 +1,6 @@
 Folder này lựa chọn các flexible residue cho các protein
 
-# **1. PPARA (7BQ2, PPARa Ligand-Binding Domain Structures with Endogenous Fatty Acids and Fibrates)** `--flexres A:273,A:279`
+# **1. PPARA (7BQ2, PPARa Ligand-Binding Domain Structures with Endogenous Fatty Acids and Fibrates)** `--flexres A:273`
 
 Based on the rigorous "Layer 3 — Full Technical Detail" extraction protocol and the thermodynamic constraints we previously established, here is the systematic derivation of the **MUST** literature-based flexible residues for the PPAR$\alpha$-LBD (PDB ID: 7BQ2) when docking completely new, bulky compounds.
 
