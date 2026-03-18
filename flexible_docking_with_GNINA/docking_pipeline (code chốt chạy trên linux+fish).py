@@ -64,7 +64,7 @@ PROTEIN_PATH = _resolve_path(
 )
 REF_LIGAND = _resolve_path("REF_LIGAND", f"{BASE_DIR}/data/ref_ligand.sdf")
 LIGAND_SDF = _resolve_path("LIGAND_SDF", f"{BASE_DIR}/data/ligands_prepared.sdf")
-FLEX_RESIDUES = "A:182,A:181,A:215,A:262,A:49"
+FLEX_RESIDUES = "A:7,A:83,A:130"
 SEED = "42"
 GPU_DEVICE = os.environ.get("GNINA_GPU_DEVICE", "0")
 
