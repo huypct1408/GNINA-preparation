@@ -83,7 +83,41 @@ By interrogating the manuscript, we bypass the automated expansion algorithms an
 
 Any deviation from this—either by freezing Phe273 (causing Arm I steric clashes) or by flexing the S280/Y314/H440/Y464 anchor (causing thermodynamic collapse)—will mathematically compromise your Monte Carlo search algorithm.
 
-# **3. MMP2 (7XJO, Discovery of Aryloxyphenyl−Heptapeptide Hybrids as Potent and Selective Matrix Metalloproteinase‑2 Inhibitors for the Treatment of Idiopathic Pulmonary Fibrosis)** `Arg7, Leu83, and Glu130`
+# 3. PPARD (7WGN, Functional and Structural Insights into Human PPARα/δ/γ Subtype Selectivity of Bezafibrate, Fenofibric Acid, and Pemafibrate) `--flexres A:293,A:303,A:312,A:417`
+
+Áp dụng giao thức 05 bước lên phức hợp 7WGN (PPARδ × pemafibrate), ma trận tính toán buộc phải giữ cứng (rigid) hoàn toàn bộ tứ đồng thuận tĩnh điện và các mỏ neo bề mặt, chỉ cấp bậc tự do (flexible) cho tối đa 4 gốc kỵ nước lót tại nhánh Arm III và xoắn alpha 5 (helix 5). Sự giới hạn này nhằm dung nạp cấu trúc chữ Y cồng kềnh của ligand mà không gây suy sụp nếp gấp protein cục bộ.
+
+Thuật toán lấy mẫu Monte Carlo của GNINA sẽ sụp đổ dưới áp lực của sự bùng nổ tổ hợp nếu toàn bộ 28 acid amin lót túi được cấp quyền di chuyển. Việc phân định chính xác ranh giới giữa sự linh hoạt cần thiết về mặt động học và độ cứng bắt buộc về mặt nhiệt động học là điều kiện tiên quyết. Pemafibrate đòi hỏi không gian lớn tại các vùng ngoại vi của túi gắn kết, nhưng lại yêu cầu một cấu trúc bám giữ cực kỳ tĩnh tại lõi xúc tác.
+
+**Kiểm toán Phân tử theo Giao thức 05 Bước:**
+
+**Bước 1: Giới hạn Không gian (Raw Pool)**
+Tập hợp thô gồm 28 acid amin lót thành túi trong bán kính 4 Å: M192, I213, L219, W228, V245, F246, R248, C249, Q250, T252, T253, H287, I290, F291, M293, L294, I297, L303, V305, V312, L317, I326, I327, K331, H413, M417, L433, Y437.
+
+**Bước 4: Quyền Phủ Quyết Nhiệt Động Học (Thực thi ưu tiên)**
+Lệnh cấm tuyệt đối (Rigid) được kích hoạt ngay lập tức để bảo vệ cấu trúc nền tảng. Bạn BẮT BUỘC loại bỏ các nhóm sau khỏi không gian tìm kiếm linh hoạt:
+*   **Bộ tứ đồng thuận cốt lõi (Orthosteric Tetrad):** Thr253, His287, His413, Tyr437. Dữ liệu tinh thể học xác nhận nhóm carboxylic của pemafibrate dựa hoàn toàn vào liên kết hydro và tương tác tĩnh điện với bốn gốc này để khóa mục tiêu tại vùng Center. Việc cấp bậc tự do cho chúng sẽ phá nát lưới tĩnh điện.
+*   **Vành đai không gian:** R248 và K331 cung cấp trường tĩnh điện cục bộ, C249 duy trì nếp gấp kỵ nước. Chúng phải bị đóng băng (Rigid).
+
+**Bước 2 & 3: Bằng chứng Động học và Xác định Cổng Không gian**
+Cấu trúc tinh thể học chỉ ra pemafibrate định hình theo cấu trúc chữ Y đặc trưng, mở rộng xuyên qua vùng Center, Arm II và Arm III. Đặc biệt, cấu hình của phân tử này tạo áp lực vật lý khổng lồ khi gốc phenoxyalkyl bị đẩy ép mạnh về phía xoắn alpha 5 (helix 5) của thụ thể PPARδ.
+Để dung nạp sự phình to này nhằm tránh lực đẩy Pauli (steric clash), các acid amin lót ranh giới Arm III và xoắn alpha 5 đóng vai trò là "cổng vật lý" bắt buộc phải điều chỉnh. Các chuỗi bên linh hoạt nội tại (như Methionine) và các gốc kỵ nước lớn vươn ra lòng túi là những điểm nghẽn chính. 
+
+**Bước 5: Nguyên lý Dao cạo Ockham**
+Ép không gian tính toán từ 21 gốc còn lại xuống ngưỡng tối ưu cho GNINA. 
+*   Các gốc kỵ nước tạo mặt phẳng trượt tĩnh (I213, L219, V245, F246, I290, F291, v.v.) bị chuyển về trạng thái cứng (Rigid) vì chúng chỉ cung cấp lực van der Waals nền.
+*   Chỉ cấp quyền linh hoạt (Flexible) cho các gốc trực tiếp chắn đường đi của nhánh phenoxyalkyl và 2-aminobenzoxazole: **M293, M417, L303, V312**. Nhóm Methionine (M293, M417) sở hữu chuỗi bên dài dễ luân chuyển, trong khi L303 và V312 đóng vai trò điều chỉnh kích thước khoang Arm III để khớp với chuyển động tịnh tiến của gốc phenoxyalkyl.
+
+**Bản đồ Cấu trúc:**
+*   **Ngoại vi:** Thiết lập này định hình mô hình induced-fit docking sát với thực tế môi trường dung dịch, nơi chỉ các vùng biên kỵ nước dao động để đón ligand có khối lượng phân tử lớn.
+*   **Nội tại:** Logic lọc đi ngược từ việc khóa cứng tâm tĩnh điện, loại trừ các gốc hỗ trợ cấu trúc tĩnh, và chỉ giải phóng cơ năng cho các rào cản không gian tại nhánh Arm III.
+
+Lập trường đối lập (LOPP) cho rằng cần mở khóa toàn bộ túi Arm II và Arm III để mô phỏng sự thích ứng động học hoàn hảo. Tiền đề này thất bại vì thuật toán GNINA xử lý quá nhiều biến số (degrees of freedom) sẽ dẫn đến sai lệch entropy hình học, sinh ra các tư thế (poses) rác. Kết luận của quy trình này sẽ bị bác bỏ chỉ khi động lực học phân tử (MD) chứng minh các gốc thơm (như F246, F291) lật hoàn toàn khỏi trục tinh thể học để ligand đi vào; tuy nhiên, độ phân giải 1.81 Å của 7WGN trực tiếp khẳng định định hướng ổn định tĩnh của chúng.
+
+**Chỉ thị Đóng (Dispositive Closure):**
+Trong quá trình chuẩn bị lưới docking GNINA cho 7WGN, bạn BẮT BUỘC cài đặt chính xác 04 residues sau sang trạng thái **Flexible: M293, M417, L303, V312**. Toàn bộ 24 residues còn lại trong bán kính 4 Å, đặc biệt là tứ diện Thr253/His287/His413/Tyr437, phải bị khóa chết ở trạng thái **Rigid**. Thiết lập này giải phóng triệt để áp lực không gian tại vùng Arm III mà không hy sinh điểm số năng lượng liên kết cốt lõi.
+
+# **4. MMP2 (7XJO, Discovery of Aryloxyphenyl−Heptapeptide Hybrids as Potent and Selective Matrix Metalloproteinase‑2 Inhibitors for the Treatment of Idiopathic Pulmonary Fibrosis)** `Arg7, Leu83, and Glu130`
 
 Molecular docking of massive hybrid inhibitors into metalloproteinases presents a rigid geometric paradox. The receptor must adapt to bulky moieties without shattering the catalytic coordination sphere. 
 
