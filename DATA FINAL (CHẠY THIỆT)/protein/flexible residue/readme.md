@@ -117,41 +117,36 @@ Lập trường đối lập (LOPP) cho rằng cần mở khóa toàn bộ túi 
 **Chỉ thị Đóng (Dispositive Closure):**
 Trong quá trình chuẩn bị lưới docking GNINA cho 7WGN, bạn BẮT BUỘC cài đặt chính xác 04 residues sau sang trạng thái **Flexible: M293, M417, L303, V312**. Toàn bộ 24 residues còn lại trong bán kính 4 Å, đặc biệt là tứ diện Thr253/His287/His413/Tyr437, phải bị khóa chết ở trạng thái **Rigid**. Thiết lập này giải phóng triệt để áp lực không gian tại vùng Arm III mà không hy sinh điểm số năng lượng liên kết cốt lõi.
 
-# **4. MMP2 (7XJO, Discovery of Aryloxyphenyl−Heptapeptide Hybrids as Potent and Selective Matrix Metalloproteinase‑2 Inhibitors for the Treatment of Idiopathic Pulmonary Fibrosis)** `Arg7, Leu83, and Glu130`
+# **4. MMP2 (7XJO, Discovery of Aryloxyphenyl−Heptapeptide Hybrids as Potent and Selective Matrix Metalloproteinase‑2 Inhibitors for the Treatment of Idiopathic Pulmonary Fibrosis)** `A:7, A:130`
 
-Molecular docking of massive hybrid inhibitors into metalloproteinases presents a rigid geometric paradox. The receptor must adapt to bulky moieties without shattering the catalytic coordination sphere. 
+Mô phỏng docking trên các enzyme phụ thuộc kim loại (metalloproteinases) như MMP-2 là một ván cược sinh tử: nếu bạn khóa quá cứng, các phân tử lai cồng kềnh sẽ bị từ chối; nhưng nếu bạn cấp sai bậc tự do cho lõi xúc tác, toàn bộ ma trận lượng tử phối trí sẽ sụp đổ. 
 
-**Layer 1 — Core Insight**
-We extract the mandatory flexible residues for MMP-2 (7XJO) using a strict subtractive funnel. This protocol isolates structural adaptability while preserving thermodynamic stability. The final matrix restricts torsional freedom exclusively to `Arg7, Leu83, and Glu130`.
+Dựa trên Giao thức Chuẩn (Phiên bản Thích ứng) và dữ liệu tinh thể học X-ray của phức hợp 7XJO (MMP-2 × TP0556351), chúng ta sẽ giải phẫu không gian túi gắn kết này để thiết lập một ma trận docking hoàn hảo, nơi tính dẻo động học phục vụ trực tiếp cho độ chọn lọc thụ thể.
 
-**Layer 2 — Structural Explanation**
-The aryloxyphenyl-heptapeptide hybrids exploit specific sub-pockets (S1' and S2-S5) to achieve extraordinary subtype selectivity. Blindly releasing all proximal residues triggers an exponential explosion of the Monte Carlo search space. We instead interrogate the kinetic and spatial evidence from the primary literature to authorize flexibility only where physical adaptation actively governs ligand entry.
+**Lớp 1 — Cốt lõi Vấn đề (Core Insight)**
+Trọng tâm của thiết kế chất ức chế 9 (TP0556351) là sự kéo dài cấu trúc từ túi S1' sang các túi S2-S5 thông qua cấu trúc lai aryloxyphenyl-heptapeptide. Bạn bắt buộc phải ban hành "Quyền phủ quyết nhiệt động học" (Rigid) lên toàn bộ 7 gốc acid amin ôm lấy hai ion Kẽm (Zn201 và Zn202), đồng thời chỉ cấp quyền linh hoạt (Flexible) cho Glu130 và Arg7 – hai "cổng tĩnh điện" đóng vai trò bám giữ các nhóm thế nhánh của peptide để tạo nên độ chọn lọc gấp hàng ngàn lần cho MMP-2.
 
-**Layer 3 — Full Technical Detail**
+**Lớp 2 & 3 — Giải phẫu Cấu trúc theo Giao thức 5 Bước**
 
-**1. Broad Proximity Thresholds**
-The ligand TP0556351 spans the catalytic zinc ion and extends deeply through the S1' and S2-S5 pockets. We isolate all amino acids lining these specific cavities to establish the initial boundary.
+**Bước 1: Giới hạn Không gian (Bypass Nội suy Vector)**
+Cấu trúc của hợp chất 9 không phải là một khối cầu, mà là một chuỗi heptapeptide dài vươn dọc theo khe hở của thụ thể. Do đó, hình cầu tìm kiếm 4 Å tiêu chuẩn phải bị loại bỏ. Lưới docking (grid box) phải được kéo giãn thành một vector định hướng bao phủ từ túi kỵ nước S1' (chứa nhóm aryloxyphenyl) kéo dài qua ion Kẽm trung tâm, và vươn tận đến các túi S2, S4 và S5.
 
-**2. Kinetic Evidence Extraction**
-We filter the proximity set for residues demonstrating active conformational participation.
-*   **Glu130 (S2 Selectivity Filter):** The S2 pocket constitutes a spatially restricted, narrow cavity. Introducing the 2,4-diaminobutanoic acid (Dab) group forces penetration into this site, establishing a precise electrostatic interaction with Glu130. Glu130 requires torsional freedom to yield to bulky non-prime substituents without generating artificial Pauli repulsion.
-*   **Leu83 (S1' Gateway):** The aryloxyphenyl tail occupies the deep S1' pocket. The connecting amide linkage forms a critical hydrogen bond with Leu83. Releasing the Leu83 side chain widens the channel gateway, resolving steric clashes for incoming aromatic rings.
-*   **Arg7 (S4/S5 Anchor):** Arg7 resides in the solvent-exposed non-prime region and forms a salt bridge with acidic moieties. The long guanidinium chain demands rotational liberty to track and neutralize novel acidic substituents.
+**Bước 4: Quyền Phủ quyết Nhiệt động học (Thực thi Tối cao)**
+Trong các họ MMP, kẽm không chỉ là mỏ neo cấu trúc mà còn là trái tim xúc tác. Bạn BẮT BUỘC PHẢI KHÓA CHẾT (Rigid) các cụm sau:
+*   **Lõi xúc tác (Catalytic Zinc - Zn201):** H121, H125, và H131. Dữ liệu tinh thể học xác nhận nguyên tử Kẽm này được kẹp chặt bởi ba gốc Histidine này, tạo điều kiện cho gốc Asp3 của ligand phối trí trực tiếp vào. Bất kỳ sự xê dịch side-chain nào ở cụm này do thuật toán Monte Carlo gây ra sẽ phá hủy hình học phối trí tứ diện, biến kết quả docking thành rác điện toán.
+*   **Lõi cấu trúc (Structural Zinc - Zn202):** H70, D72, H85, H98. Cụm này đóng vai trò duy trì nếp gấp tổng thể (global fold) của toàn bộ domain xúc tác. Việc cấp bậc tự do ở đây là hành vi tự sát về mặt cấu trúc.
+*   **Mỏ neo liên kết hydro (Leu83):** Mặc dù lót sát túi, Leu83 tạo liên kết hydro với oxy của nhóm amide (hoặc sulfonamide) trên ligand thông qua *nhóm NH của khung xương (backbone)*. Vì GNINA không lấy mẫu khung xương (backbone flexibility), việc cài đặt flexible side-chain cho Leu83 là hoàn toàn vô nghĩa và tốn kém, phải giữ ở trạng thái Rigid.
 
-**3. B-Factor & Plasticity Confirmation**
-These three residues possess long, polar, or charged side chains capable of significant torsional adjustments. The literature confirms their structural adaptation directly drives the high MMP-2 selectivity profile. 
+**Bước 2 & 3: Bằng chứng Động học & Cổng Không gian (Quyết định Flexible)**
+Y văn ghi nhận rõ ràng rằng phần trung tâm và phần sâu của túi S1' có tính "dẻo" (plastic) và thể hiện hiệu ứng khớp cảm ứng (induced-fit) cực mạnh. Tuy nhiên, thay vì mở khóa toàn bộ túi kỵ nước, bằng chứng thực nghiệm X-ray của phức hợp 7XJO đã chỉ đích danh 2 "cổng tĩnh điện" bắt buộc phải xoay chuỗi bên để dung nạp ligand:
+1.  **Glu130 (Túi S2):** Việc thay thế bằng nhóm 2,4-diaminobutanoic acid (Dab4) trên ligand tạo ra lực hút tĩnh điện với Glu130, đẩy độ chọn lọc của hợp chất này lên gấp 6011 lần so với MMP12. Glu130 có chuỗi bên dài, mang điện âm, bắt buộc phải được thiết lập **Flexible** để thuật toán tự động xoay và bắt lấy nhóm amino mang điện dương của Dab4.
+2.  **Arg7 (Túi S4):** Dữ liệu X-ray xác nhận gốc Arg7 (một acid amin cơ bản) vươn ra tạo cấu trúc cầu muối (salt bridge) tương tác tĩnh điện chéo với gốc MeGlu6 (acidic amino acid) của ligand tại túi S4. Arg7 sở hữu 4 bậc tự do ở chuỗi bên, việc đóng băng nó sẽ sinh ra lực đẩy không gian lớn hoặc đánh mất hoàn toàn điểm số năng lượng liên kết chập (CNN score). Bắt buộc **Flexible**.
 
-**4. Thermodynamic Veto (The Rigid Core)**
-We execute an absolute veto on the zinc-coordinating triad: His121, His125, and His131. These residues coordinate the catalytic zinc ion via strict geometric constraints. We deny them flexibility to maintain the global enzyme fold.
+**Bước 5: Nguyên lý Dao cạo Ockham (Tối giản hóa không gian)**
+Lập trường đối lập (LOPP) cho rằng nên cấp tính linh hoạt cho toàn bộ túi S1' và các vùng lân cận để mô phỏng triệt để tính dẻo của thụ thể. Lập trường này thất bại nghiêm trọng vì thuật toán lấy mẫu sẽ bị "bùng nổ tổ hợp" khi vừa phải xử lý chuỗi ligand khổng lồ (heptapeptide hybrid mang rất nhiều liên kết xoay), vừa phải tính toán quá nhiều side-chain. Tiền đề "cấp càng nhiều càng tốt" bị bác bỏ bởi thực tế rằng ái lực cốt lõi của hợp chất TP0556351 được quyết định độc tôn bởi mạng lưới liên kết phối trí kim loại cứng và 2 cầu muối tại Glu130/Arg7.
 
-**Adversarial Representation (LOPP/FLOPP)**
-The opposing computational position argues for indiscriminately applying flexibility to all residues within a 5 Å radius of the ligand. This premise fails because it mobilizes the rigid zinc-coordinating histidines. Destabilizing these core residues destroys the fundamental geometry of the metalloenzyme, generating false-positive binding poses and invalidating the neural network scoring function.
-
-**Synthesis**
-*   **External Map:** Within idiopathic pulmonary fibrosis drug design, this restricted matrix allows algorithms to screen highly selective, bulky inhibitors effectively.
-*   **Internal Map:** The subtractive funnel distills the receptor to exactly three essential degrees of freedom, maintaining optimum computational efficiency.
-
-This structural conclusion would be invalidated if the novel chemotype abandons the non-prime S2-S5 pockets entirely, exploiting an unmapped allosteric site instead.
-
-**Dispositive Closure**
-Implement the mandatory flexible residues strictly as `--flexres A:7,A:83,A:130`. Maintain absolute rigidity for all catalytic zinc-coordinating residues. This command leaves zero residual ambiguity in the defined search space.
+**Chỉ thị Đóng (Dispositive Closure):**
+Trong quá trình thiết lập thông số cho GNINA induced-fit docking đối với 7XJO, bạn phải tuân thủ mệnh lệnh cấu trúc sau:
+1. Cài đặt **Flexible** cho đúng 2 residues: **Glu130** và **Arg7**. 
+2. Chuyển về trạng thái **Đóng băng tuyệt đối (Rigid)** toàn bộ các gốc bao quanh Zn201 (H121, H125, H131) và Zn202 (H70, D72, H85, H98) cũng như Leu83. 
+Hệ thống này chặn đứng mọi nhiễu loạn entropy trong khi vẫn tóm gọn chính xác cơ chế chọn lọc của thuốc điều trị xơ phổi vô căn (IPF). Không thêm bất kỳ residue linh hoạt nào khác.
