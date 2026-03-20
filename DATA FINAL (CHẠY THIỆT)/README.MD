@@ -1,7 +1,7 @@
 Protein cần docking là
 ```
 ┌─ MMP FAMILY (4)
-│  ├─ MMP2 ⭐⭐⭐ [Primary Target - Di căn] (không có cấu trúc tinh thể thì chuyển sang MMP14)
+│  ├─ MMP2 ⭐⭐⭐ [Primary Target - Di căn] (không có cấu trúc tinh thể thì chuyển sang MMP14 hoặc MMP3)
 │  ├─ MMP9 ⭐⭐⭐ [Primary Target - Viêm/Di căn]
 │  ├─ MMP13 ⭐⭐ [Secondary Target]
 │  └─ MMP1 🛑 [ANTI-TARGET - Bắt buộc để test Selectivity]
