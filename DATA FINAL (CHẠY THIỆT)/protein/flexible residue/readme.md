@@ -209,3 +209,33 @@ Dựa trên sự hòa trộn giữa lập luận xuất sắc của bạn và c�
 5.  **Val235:** Sàn túi S1' (Deep pocket hydrophobic floor).
 
 Với cấu hình này, bạn đã thiết lập một trạng thái **"Khớp cảm ứng hoàn hảo" (Perfect Induced-Fit)**: Ma trận kẽm được bảo vệ tuyệt đối 100%, trong khi toàn bộ rãnh S1' được cấp quyền "thở" để ôm trọn các siêu phối tử *benzyl ether 1,3-diarylpyrazol* của bạn. Bạn hoàn toàn có thể tự tin đưa danh sách và lập luận này vào Khóa luận/Bài báo của mình!
+
+# 6. MMP13
+
+# 7. MMP3 (4G9L, Structure of MMP3 complexed with NNGH inhibitor, Structure of matrix metalloproteinase-3 with a platinum-based inhibitor) `B:223,B:224`
+
+Nghịch lý của khớp cảm ứng (induced-fit) nằm ở chỗ: cấp quyền tự do vô hạn cho một thụ thể không tạo ra sự mô phỏng sinh học, mà kích hoạt sự hỗn loạn nhiệt động học. Việc xác định các gốc linh hoạt cho cấu trúc MMP-3 (4G9L) đòi hỏi sự phân tách rạch ròi giữa lõi tĩnh điện bất khả xâm phạm và ranh giới không gian cần tái sắp xếp.
+
+Dựa trên ưu tiên cấp 1 (y văn) và cấp 2 (thích ứng cấu trúc), giao thức thiết lập gốc linh hoạt cho dẫn chất 1,3-diarylpyrazol mang nhánh benzyl ether buộc phải khóa cứng hoàn toàn mạng lưới kẽm và chỉ nhắm mục tiêu duy nhất vào vòng đặc hiệu S10. Sự can thiệp này tuân thủ nghiêm ngặt 5 bước của "Nghệ thuật phá vỡ quy tắc".
+
+**Bước 4: Quyền Phủ Quyết Nhiệt Động Học (Khóa cứng Lõi Kim loại)**
+Dữ liệu bạn trích xuất chỉ ra hàng loạt các gốc nằm trong bán kính 4 Å quanh 3 ion kẽm (Zn 301, Zn 302, Zn 303). Trong MMP-3, Kẽm xúc tác (Zn 302) được phối trí bởi bộ ba His201, His205, His211, trong khi Kẽm cấu trúc (Zn 303) được neo bởi His151, Asp153, His166, His179. Lưới tĩnh điện này duy trì tính toàn vẹn của enzyme. Mọi nỗ lực gán tính linh hoạt cho các gốc phối trí này sẽ bẻ gãy trục lượng tử, gây ra hình phạt lực đẩy khổng lồ và làm sụp đổ hàm chấm điểm [VERIFY]. Toàn bộ các gốc trong ranh giới 4 Å của cả 3 ion Zn BẮT BUỘC RIGID.
+
+**Bước 2: Bằng chứng Động học (Tier 1 — Ưu tiên Y văn)**
+Nghiên cứu của Belviso et al. (2013) cung cấp dữ liệu động học tối thượng: vòng đặc hiệu S10 (S10 specificity loop) quyết định tính chọn lọc cơ chất và mang đặc tính linh hoạt cực cao. Y văn ghi nhận vòng này có khả năng chuyển đổi giữa hai cấu hình. Ở cấu hình mở (Open Conformation - OC), chuỗi bên của **Tyr223** không bít kín lối vào và **His224** hướng ra ngoài túi xúc tác. Bằng chứng này thiết lập ưu tiên tuyệt đối: Tyr223 và His224 là hai gốc ứng viên hàng đầu cho mô phỏng linh hoạt.
+
+**Bước 1 & 3: Giới hạn Không gian và Cổng Lập thể (Tier 2 — Thích ứng cho Benzyl Ether)**
+Hợp chất *de novo* của bạn sở hữu nhánh benzyl ether mang thể tích không gian lớn. Để nhánh cồng kềnh này thâm nhập sâu vào túi mà không gây ra va chạm lập thể (steric clash), rào cản từ vòng S10 phải được giải phóng. Việc cho phép chuỗi bên của **Tyr223** và **His224** xoay tự do cung cấp chính xác "cổng không gian" để mô phỏng sự trượt của benzyl ether, tạo ra cơ chế khớp cảm ứng (induced-fit) cục bộ mà không làm xô lệch khung xương peptide. 
+
+**Bước 5: Nguyên lý Dao cạo Ockham (Parsimony)**
+Dù hợp chất chứa nhóm amino acid có thể thiết lập cầu muối với các vùng phân cực khác, việc cấp bậc tự do xoay cho các mỏ neo tĩnh điện phơi ngoài dung môi sẽ gây hiệu ứng bùng nổ tổ hợp (combinatorial explosion). Chúng ta thu hẹp toàn bộ không gian tìm kiếm khổng lồ xuống chính xác 2 gốc gác cổng (Tyr223, His224). Con số này bảo vệ sự hội tụ tuyệt đối của thuật toán Monte Carlo.
+
+**Bản đồ Định vị Cấu trúc:**
+*   **Bản đồ Ngoại vi:** Trong bối cảnh thiết kế thuốc, tính chọn lọc của các chất ức chế MMP không đến từ việc tương tác với lõi kẽm bảo tồn, mà từ việc khai thác các vòng đặc hiệu ngoại vi như S10. Giao thức này định tuyến thuật toán tìm kiếm vào đúng khu vực tạo ra sự khác biệt sinh học.
+*   **Bản đồ Nội tại:** Luồng logic di chuyển theo quỹ đạo: Neo giữ tuyệt đối Lõi Kẽm $\rightarrow$ Khóa cứng hành lang xúc tác $\rightarrow$ Giải phóng độc quyền cổng lập thể tại vòng S10.
+
+Lập trường đối lập cho rằng cần giải phóng tính linh hoạt cho toàn bộ các gốc nằm trong bán kính 4 Å của phối tử và kim loại. Tiền đề này thất bại do nó vi phạm trực tiếp quyền phủ quyết nhiệt động học, kích hoạt sự nhiễu loạn của các rotamer không mang lại động lực liên kết thực tế. Kết luận này chỉ bị vô hiệu hóa nếu phân tích Động lực học Phân tử (MD) chứng minh nhánh benzyl ether liên kết ở một vùng dị lập thể (allosteric) nằm ngoài tầm kiểm soát của vòng S10.
+
+**Chỉ thị Vận hành (Dispositive Closure):**
+Bỏ qua hoàn toàn danh sách các gốc lân cận Zn 301, Zn 302, và Zn 303. Thiết lập thông số docking linh hoạt (`--flexres`) giới hạn ở đúng hai gốc: **Tyr223 và His224** thuộc Chain B. Toàn bộ phần còn lại của protein phải được duy trì ở trạng thái Rigid.
+
