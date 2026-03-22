@@ -309,3 +309,72 @@ Successful induced-fit docking (IFD) with GNINA for the bulky *de novo* 1,3-diar
 *   **Sources + Locations:** McNutt et al. (GNINA 1.3), Introduction; Plainer et al. (DiffDock-Pocket), Section 1 Introduction.
 *   **Evidence Strength:** High (Algorithmic Constraint).
 *   **Why this matters:** This directly falsifies the assumption that all residues within a 4 Å radius should be flexible. If you set all surrounding residues to flexible, GNINA will exhaust its sampling resources generating thermodynamic noise (invalid rotamers). Locking the receptor backbone and non-essential side chains ensures the algorithm isolates its computational power to the 5 residues (Arg513, His90, Val523, Val434, Tyr385) that actually dictate ligand binding.
+
+# 10. PTGES (5TL9, crystal structure of mPGES-1 bound to inhibitor, Discovery and characterization of [(cyclopentyl)ethyl]benzoic acid inhibitors of microsomal prostaglandin E synthase-1) `A:52,A:28,A:32,A:44`
+
+Thesis — ChimeraX verified (within 4Å of 7DN)
+9 residues + HOH307 tiếp xúc trực tiếp với 7DN trong 4 Å: Y28, A31, I32, G35, R38, L39, F44, R52, H53. Áp dụng Adaptive SOP 5 bước: --flexres cuối cùng gồm 5 residues — R52, Y28, I32, F44, H53. Các residues còn lại (A31, G35, R38, L39) bị loại bởi SOP Bước 4 và 5.
+10 contacts — phân loại theo Adaptive SOP
+R52
+Arginine · Salt bridge anchor
+FLEX ✓ — Tier 1
+Bidentate salt bridge trực tiếp với carboxylate. NH2↔7DN O2. Amino acid -COOH của new compounds cần Arg52 rotamer optimization.
+Partridge (2017): "bidentate salt bridge to Arg52"
+Bước 1 Bước 2
+H53
+Histidine · Water bridge + direct
+FLEX limited
+NE2↔7DN O1 = 3.47 Å (direct) + HOH307 bridge (2.712 Å). Flexible trong standard rotamer library — không rigid hoàn toàn.
+Partridge (2017): "coordinates to His53 through water bridge"
+Bước 2 Bước 3
+Y28
+Tyrosine · Hydrophobic groove
+FLEX ✓ — Tier 1
+VdW contact xác nhận. Benzyl ether group của new compounds bulkier hơn N-aryl piperidine → cần Tyr28 rotamer space.
+Partridge (2017): "VdW contacts with Tyr28"
+Bước 1 Bước 2
+I32
+Isoleucine · Deep cleft gate
+FLEX ✓ — Tier 1
+"Cleft behind Ile32" — paper đích danh. Pyrazole core của new compounds cần entry vào cleft này. Steric gate quan trọng nhất.
+Partridge (2017): "cleft behind Ile32"
+Bước 2 Bước 3
+F44
+Phenylalanine · Proximity gate
+FLEX ✓ — Tier 2
+Trong 4Å nhưng paper không đề cập trực tiếp. SOP Bước 1 (spatial) đủ căn cứ. Phe44 aromatic ring có thể π-stack với pyrazole core của new compounds.
+ChimeraX: F44 within 4Å · SOP Bước 1 bypass
+Bước 1
+HOH307
+Water bridge · Static
+STATIC — giữ trong receptor
+O↔His53 NE2=2.712Å, O↔7DN O1=2.690Å. Không phải flexres — là static molecule trong receptor. Đã thảo luận trước.
+Partridge (2017): "water bridge"
+Bước 3 — water network
+A31
+Alanine · Backbone only
+RIGID — SOP Bước 4
+Ala không có sidechain có ý nghĩa — chỉ có Cβ (methyl). Rotamer không ảnh hưởng binding. Backbone rigid là đúng.
+SOP Bước 4 — Thermodynamic Veto: no functional sidechain
+Bước 4 Bước 5
+G35
+Glycine · No sidechain
+RIGID — SOP Bước 4
+Gly không có sidechain — không có rotamer để sample. GNINA không thể làm gì với Gly trong flexres. Backbone-only contact.
+SOP Bước 4 — No sidechain atoms
+Bước 4
+R38
+Arginine · Distal contact
+RIGID — SOP Bước 5
+Arg38 trong 4Å nhưng paper không đề cập. Đã có R52 làm salt bridge anchor — 2 Arg trong flexres là redundant. Parsimony loại R38.
+SOP Bước 5 — Parsimony: R52 đã cover Arg interactions
+Bước 5
+L39
+Leucine · Peripheral contact
+RIGID — SOP Bước 5
+Leu39 trong 4Å nhưng paper không đề cập trong binding mode. Peripheral hydrophobic — không phải gác cổng trực tiếp. Parsimony loại.
+SOP Bước 5 — Parsimony: not a gating residue
+Bước 5
+Tại sao Tyr130, Gln134, Thr131 không có trong list
+ChimeraX xác nhận: Tyr130, Gln134, Thr131 không trong 4Å của 7DN. Paper đề cập các residues này là cross-chain contacts trong homotrimer mPGES-1 — không phải intra-chain A contacts. Loại hoàn toàn khỏi flexres. Đây là correction quan trọng nhất so với ý kiến trước.
+
