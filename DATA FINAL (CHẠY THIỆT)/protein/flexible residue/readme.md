@@ -266,3 +266,46 @@ Kết luận duy trì Tyr240 ở trạng thái cứng chỉ bị bác bỏ nếu
 
 **Chỉ thị Vận hành (Dispositive Closure):**
 Giao thức 5 gốc của bạn chứa một tham số phá hoại. Bạn có nghĩa vụ phải giảm danh sách linh hoạt xuống còn đúng **4 gốc: Asn180, Tyr210, Tyr237, và Met236**. Xóa bỏ Tyr240 khỏi thiết lập `--flexres` và khóa cứng nó cùng với toàn bộ hệ thống phối trí kim loại. Việc tuân thủ mệnh lệnh này đảm bảo nền tảng nhiệt động học thuần khiết nhất để đánh giá hợp chất *de novo* của bạn.
+
+# 9. PTGS2 (5KIR, The Structure of Vioxx Bound to Human COX-2, Crystal structure of rofecoxib bound to human cyclooxygenase-2)  `A:513,A:90,A:523,A:434,A:385`
+
+**THESIS-EVIDENCE MAP: FLEXIBLE RESIDUE SELECTION FOR 5KIR (GNINA IFD)**
+
+**Thesis Statement:** 
+Successful induced-fit docking (IFD) with GNINA for the bulky *de novo* 1,3-diarylpyrazole benzyl ether compound requires abandoning arbitrary distance-based flexibility cutoffs. Receptor flexibility must be strictly limited to the side-pocket gatekeepers (Val523, Val434), the electrostatic base anchors (Arg513, His90), and the hydrophobic apex (Tyr385), as directly evidenced by the crystallographic binding mode of the structurally analogous diaryl heterocycle, rofecoxib, in human COX-2 (5KIR).
+
+---
+
+**DATA POINT 1: THE ELECTROSTATIC BASE ANCHORS (Arg513, His90)**
+
+*   **Supporting Citations/Explanations:** Rofecoxib (Vioxx) forms its only hydrophilic interactions within the cyclooxygenase channel via its methyl sulfone moiety, which directly contacts the side-chain nitrogen atoms of His90 and Arg513. These residues are located at the very base of the COX-2 specific side pocket. 
+*   **Sources + Locations:** Orlando & Malkowski (2016), Section 1 Introduction; Section 3.1 Vioxx binding pose.
+*   **Evidence Strength:** High (Tier 1 — Direct Crystallographic Evidence).
+*   **Why this matters:** Your *de novo* compound contains an amino acid moiety that requires precise electrostatic anchoring. Allowing side-chain flexibility for His90 and Arg513 enables GNINA's Markov chain Monte Carlo (MCMC) algorithm to optimize hydrogen-bonding geometries for this novel polar group, preventing artificial steric clashes or energetic penalties that rigid docking would falsely generate.
+
+---
+
+**DATA POINT 2: THE SIDE POCKET GATEKEEPERS (Val523, Val434)**
+
+*   **Supporting Citations/Explanations:** The first-shell substitutions of Ile434 to Val434 and Ile523 to Val523 are the hallmark structural differences creating the COX-2 side pocket, yielding a ~25% increase in active site volume. Access to this pocket by diaryl heterocycle scaffolds (like coxibs) is entirely dependent on the presence of Val523.
+*   **Sources + Locations:** Orlando & Malkowski (2016), Section 1 Introduction.
+*   **Evidence Strength:** High (Tier 1 — Molecular Basis of Selectivity).
+*   **Why this matters:** The bulky benzyl ether group of your *de novo* scaffold requires substantial spatial clearance to penetrate the side pocket. Defining Val523 and Val434 as flexible provides the critical "sliding space" for the algorithm to accommodate the bulky functional group without triggering massive van der Waals repulsion in the scoring function.
+
+---
+
+**DATA POINT 3: THE HYDROPHOBIC APEX (Tyr385)**
+
+*   **Supporting Citations/Explanations:** The binding conformation of rofecoxib features a phenyl ring extending upward to interact directly with the side chain of Tyr385. Aside from the specific interactions at the base of the side pocket, all remaining enzyme-inhibitor contacts within the channel are hydrophobic in nature.
+*   **Sources + Locations:** Orlando & Malkowski (2016), Section 3.1 Vioxx binding pose.
+*   **Evidence Strength:** Medium-High (Tier 2 — Spatial Adaptation).
+*   **Why this matters:** The 1,3-diarylpyrazole core is a rigid, aromatic scaffold. Granting torsional flexibility to the Tyr385 side chain permits the dynamic optimization of $\pi-\pi$ stacking interactions, directly maximizing the empirical and convolutional neural network (CNN) binding affinity scores in GNINA for the ligand's upper aromatic ring. 
+
+---
+
+**DATA POINT 4: THERMODYNAMIC VETO ON PERIPHERAL FLEXIBILITY**
+
+*   **Supporting Citations/Explanations:** Algorithms utilized by deep learning frameworks like GNINA rely on grid-based scoring and localized MCMC sampling. While flexible docking models structural changes upon binding, excessive degrees of freedom exponentially increase the search space, degrading pose prediction accuracy if the algorithm cannot converge.
+*   **Sources + Locations:** McNutt et al. (GNINA 1.3), Introduction; Plainer et al. (DiffDock-Pocket), Section 1 Introduction.
+*   **Evidence Strength:** High (Algorithmic Constraint).
+*   **Why this matters:** This directly falsifies the assumption that all residues within a 4 Å radius should be flexible. If you set all surrounding residues to flexible, GNINA will exhaust its sampling resources generating thermodynamic noise (invalid rotamers). Locking the receptor backbone and non-essential side chains ensures the algorithm isolates its computational power to the 5 residues (Arg513, His90, Val523, Val434, Tyr385) that actually dictate ligand binding.
