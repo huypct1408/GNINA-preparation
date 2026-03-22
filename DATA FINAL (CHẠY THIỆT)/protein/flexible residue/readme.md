@@ -379,3 +379,84 @@ Bước 5
 Tại sao Tyr130, Gln134, Thr131 không có trong list
 ChimeraX xác nhận: Tyr130, Gln134, Thr131 không trong 4Å của 7DN. Paper đề cập các residues này là cross-chain contacts trong homotrimer mPGES-1 — không phải intra-chain A contacts. Loại hoàn toàn khỏi flexres. Đây là correction quan trọng nhất so với ý kiến trước.
 
+# 11. ALOX5 (6N2W, The structure of Stable-5-Lipoxygenase bound to NDGA, Structural and mechanistic insights into 5-lipoxygenase inhibition by natural products) `B:596,B:599,B:359,B:368,B:607,B:363`
+
+<img width="1040" height="869" alt="image" src="https://github.com/user-attachments/assets/0368f42d-ba65-4155-b135-5f96a0e8e1c8" />
+
+Data thực tế từ ChimeraX đã có. Áp dụng Adaptive SOP để phân xử.**Tóm tắt verdict về ý kiến trước:**
+
+Ý kiến đó **đúng về nguyên tắc lõi** — His372/Ile673 rigid vì Fe²⁺ coordination là hoàn toàn chính xác. NDGA tenuously bridges this ravine, tethered only by Arg596, with nominal protein-ligand contacts. One catechol ring sits above the iron and blocks access to the open position of its coordination sphere.
+
+Nhưng có **2 lỗi thực tế:**
+
+**1. Leu368 bị bỏ sót** khỏi Dispositive Closure — paper Fig.1c LigPlot liệt kê rõ, phải có trong flexres.
+
+**2. Framing His367/His550 như "cần rigid vì Fe coordination"** — đúng về trạng thái nhưng không cần thiết vì chúng không phải 30Z contacts, không xuất hiện trong flexres discussion.
+
+`--flexres B:596,B:599,B:359,B:368,B:607,B:363` là string đúng nhất dựa trên data thực tế.
+
+Tưởng tượng một kho tiền với cánh cửa đã mở toang, nhưng bên trong lại chứa một mạng lưới laser bảo vệ siêu nhạy; việc bạn kích hoạt nhầm bất kỳ tia laser nào sẽ khiến hệ thống tự hủy. Giao thức nới lỏng toàn bộ các gốc trong vòng 4 Å quanh chất ức chế cũ là một sai lầm chết người đối với 6N2W.
+
+**Layer 1 — Core Insight**
+Giao thức "Nghệ thuật phá vỡ quy tắc" yêu cầu bạn phải phân rã danh sách tiếp xúc của NDGA (30Z) thành các vùng giới hạn nhiệt động học tuyệt đối. Bạn BẮT BUỘC phải khóa cứng (rigid) toàn bộ mạng lưới phối trí ion Sắt (đặc biệt là His372 và Ile673), đồng thời chỉ cấp quyền linh hoạt (`--flexres`) cho mỏ neo tĩnh điện phân cực (Arg596) và các gốc kỵ nước cồng kềnh (Trp599, Phe359, Leu607) để tạo không gian trượt cho nhánh benzyl ether.
+
+**Layer 2 — Structural Explanation**
+Khác với các túi liên kết khép kín, 6N2W bộc lộ một "khe nứt sâu" do chuỗi xoắn gác cổng đã bị phá vỡ hoàn toàn. NDGA neo đậu rất lỏng lẻo trong khe nứt này với các tiếp xúc Van der Waals cực kỳ hạn chế. Nếu bạn nới lỏng toàn bộ các gốc ngoại vi, mạng nơ-ron tích chập (CNN) của thuật toán sẽ lãng phí tài nguyên lấy mẫu (sampling) vào khoảng không vô nghĩa. Quan trọng hơn, ion Fe2+ là hố thế năng thiết yếu nhất của enzyme; việc nới lỏng các gốc phối trí kim loại sẽ cho phép thuật toán MCMC xoay chúng ra khỏi trục liên kết lượng tử gốc, gây ra sự bùng nổ lực đẩy tĩnh điện nội tại và đánh sập điểm số của phối tử.
+
+**Layer 3 — Full Technical Detail**
+
+**THESIS-EVIDENCE MAP: CHIẾN LƯỢC LỰA CHỌN GỐC LINH HOẠT CHO 6N2W**
+
+**Thesis Statement:**
+Quỹ đạo khớp cảm ứng (IFD) cho dẫn chất *de novo* 1,3-diarylpyrazol mang nhóm amino acid chỉ thành công khi áp dụng lệnh phủ quyết nhiệt động học: cấm tuyệt đối tính linh hoạt tại vùng lõi Fe2+ và các gốc xương sống, trong khi kích hoạt tối đa độ đàn hồi tại mỏ neo Arg596 và vách kỵ nước ngoại vi.
+
+---
+
+**ĐIỂM DỮ LIỆU 1: LỆNH PHỦ QUYẾT LƯỢNG TỬ TẠI LÕI SẮT (MUST BE RIGID: His367, His372, His550, Asn554, Ile673)**
+
+*   **Supporting Citations/Explanations:** Dữ liệu tinh thể học xác nhận His372 là một trong các gốc phối trí trực tiếp tạo liên kết với ion Fe2+. Vòng catechol của NDGA nằm ngay phía trên ion Sắt và chặn hướng tiếp cận mở của khối cầu phối trí kim loại này. Ile673 và Asn554 cũng nằm trong giới hạn 4 Å quanh Fe2+.
+*   **Sources + Locations:** "Structural and mechanistic insights...", Results, Hình 1b-c. Dữ liệu hệ quy chiếu người dùng.
+*   **Evidence Strength:** High (Bằng chứng hình học không gian L1).
+*   **Why this matters (Tại sao điều này quan trọng):** Khóa cứng bộ năm gốc này là nguyên tắc sống còn. Nếu His372 hoặc Ile673 được đưa vào cờ `--flexres`, bộ lấy mẫu MCMC sẽ bẻ gãy khoảng cách phối trí 2.16 Å lý tưởng để nhường chỗ cho phân tử *de novo* khổng lồ của bạn. Hàm chấm điểm vật lý sẽ lập tức áp đặt hình phạt vô cực (infinite penalty) cho sự sụp đổ của phức chất kim loại này.
+
+---
+
+**ĐIỂM DỮ LIỆU 2: ĐẶC QUYỀN MỎ NEO TĨNH ĐIỆN (MUST BE FLEXIBLE: Arg596)**
+
+*   **Supporting Citations/Explanations:** Cấu trúc NDGA lơ lửng trong rãnh kỵ nước và được "neo giữ" (tethered) độc quyền bởi một liên kết hydro duy nhất với Arg596 (khoảng cách 2.8 Å).
+*   **Sources + Locations:** "Structural and mechanistic insights...", Results, Hình 1c.
+*   **Evidence Strength:** High.
+*   **Why this matters (Tại sao điều này quan trọng):** Phân tử *de novo* của bạn chứa gốc amino acid (-COOH, -NH2). Ở pH sinh lý, nhóm carboxylate tích điện âm cần bắt cặp với một gốc mang điện dương. Bằng cách thiết lập Arg596 ở trạng thái linh hoạt, thuật toán sẽ tự động dò tìm và xoay góc nhị diện của nhóm guanidinium (+1) để thiết lập một liên kết cầu muối (salt bridge) hoàn hảo với dẫn chất của bạn.
+
+---
+
+**ĐIỂM DỮ LIỆU 3: KHÔNG GIAN TRƯỢT CHO KHUNG ĐA VÒNG (MUST BE FLEXIBLE: Trp599, Phe359, Leu607, Gln363, Leu368)**
+
+*   **Supporting Citations/Explanations:** NDGA tạo ra rất ít tiếp xúc Van der Waals do sự phơi nhiễm của rãnh xúc tác. Tuy nhiên, các gốc kỵ nước cồng kềnh như Trp599, Phe359 và Leu607 tạo thành thành vách bao quanh trục phân tử.
+*   **Sources + Locations:** "Structural and mechanistic insights...", Hình 1c (LigPlot).
+*   **Evidence Strength:** High.
+*   **Why this matters (Tại sao điều này quan trọng):** Lõi 1,3-diarylpyrazol gắn nhánh benzyl ether có thể tích không gian (steric bulk) lớn hơn gấp nhiều lần vòng catechol đơn gốc của NDGA. Việc nới lỏng Trp599 và Phe359 cung cấp "độ đàn hồi" (sliding space) bắt buộc để mạng CNN xoay các vòng thơm này ra xa, ngăn chặn va chạm không gian (steric clash) mà không làm suy giảm ái lực kỵ nước.
+
+---
+
+**ĐIỂM DỮ LIỆU 4: NGUYÊN LÝ TỐI GIẢN TẠI GỐC CHẾT (MUST BE RIGID: Pro569, Ala410, Ala603, Ile406, Asn407, Gln557, His600)**
+
+*   **Supporting Citations/Explanations:** Pro569 và Ala410/Ala603 có mặt trong danh sách tiếp xúc quanh ligand. Tuy nhiên, Proline bị khóa chết vào khung xương peptide, trong khi Alanine chỉ có một nhánh methyl không thể xoay góc rotamer. Các gốc còn lại đóng vai trò thứ cấp.
+*   **Sources + Locations:** SOP Bước 4 (Thermodynamic Veto); Hình 1c.
+*   **Evidence Strength:** Medium-High.
+*   **Why this matters (Tại sao điều này quan trọng):** Đưa các gốc không có khả năng vặn xoắn chuỗi bên (Ala, Pro) vào danh sách linh hoạt là một thảm họa tính toán. Nó bơm entropy giả tạo vào thuật toán và làm tăng rủi ro phân kỳ của mô phỏng mà không đóng góp bất kỳ điểm số tương tác nào.
+
+---
+
+**Hai Bản Đồ Định Vị:**
+*   **Bản đồ ngoại vi:** Trong docking cấu trúc phơi nhiễm (như 6N2W), ái lực không đến từ việc ligand chui vừa một cái lỗ, mà từ việc ligand ôm lấy các mỏ neo nhô ra (Arg596, Fe2+) trên một bình nguyên rộng lớn.
+*   **Bản đồ nội tại:** Quỹ đạo luận lý: Xác định 4 Å $\rightarrow$ Loại trừ tức khắc toàn bộ vùng phối trí Sắt (His/Ile/Asn) $\rightarrow$ Loại trừ các gốc khung xương (Ala/Pro) $\rightarrow$ Tuyệt đối ưu tiên mỏ neo (Arg596) $\rightarrow$ Giải phóng vách kỵ nước (Trp/Phe/Leu).
+
+**Tổng hợp và Giới hạn (Falsification):**
+Lập trường đối lập (FLOPP) cho rằng "cần nới lỏng His372 vì vòng pyrazol có thể tương tác với nó" thất bại hoàn toàn. Tiền đề này sai lệch vì trong hóa học lượng tử, liên kết cộng hóa trị phối trí với Sắt có năng lượng > 50 kcal/mol, hoàn toàn áp đảo bất kỳ tương tác VdW hay H-bond nào (~1-5 kcal/mol) mà ligand có thể tạo ra. Kết luận này chỉ bị vô hiệu hóa nếu phân tử của bạn được thiết kế với một đầu đạn hydroxamic acid nhắm trực tiếp vào việc chiếm đoạt Sắt từ protein.
+
+**Chỉ thị Vận hành (Dispositive Closure):**
+Loại bỏ ngay lập tức danh sách 4 Å tự động của bạn. Thiết lập chính xác tham số `--flexres` trong GNINA với danh sách độc quyền sau: **ARG596, TRP599, PHE359, LEU607, GLN363, LEU368**. 
+Các gốc thuộc vòng phối trí Sắt (HIS367, HIS372, HIS550, ILE673, ASN554) và các gốc không có rotamer chức năng (PRO569, ALA410, ALA603) BẮT BUỘC phải duy trì trạng thái KHÓA CỨNG (RIGID). Chạy lệnh này để hội tụ quỹ đạo mô phỏng.
+
+
