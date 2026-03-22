@@ -311,6 +311,7 @@ Successful induced-fit docking (IFD) with GNINA for the bulky *de novo* 1,3-diar
 *   **Why this matters:** This directly falsifies the assumption that all residues within a 4 Å radius should be flexible. If you set all surrounding residues to flexible, GNINA will exhaust its sampling resources generating thermodynamic noise (invalid rotamers). Locking the receptor backbone and non-essential side chains ensures the algorithm isolates its computational power to the 5 residues (Arg513, His90, Val523, Val434, Tyr385) that actually dictate ligand binding.
 
 # 10. PTGES (5TL9, crystal structure of mPGES-1 bound to inhibitor, Discovery and characterization of [(cyclopentyl)ethyl]benzoic acid inhibitors of microsomal prostaglandin E synthase-1) `A:52,A:28,A:32,A:44`
+<img width="982" height="918" alt="image" src="https://github.com/user-attachments/assets/c0de0eca-0eda-4f28-9ce9-fad8a00dc395" />
 
 Thesis — ChimeraX verified (within 4Å of 7DN)
 9 residues + HOH307 tiếp xúc trực tiếp với 7DN trong 4 Å: Y28, A31, I32, G35, R38, L39, F44, R52, H53. Áp dụng Adaptive SOP 5 bước: --flexres cuối cùng gồm 5 residues — R52, Y28, I32, F44, H53. Các residues còn lại (A31, G35, R38, L39) bị loại bởi SOP Bước 4 và 5.
