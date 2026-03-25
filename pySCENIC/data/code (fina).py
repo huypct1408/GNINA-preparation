@@ -115,7 +115,7 @@ class Config:
     # 1% of ~1500 bulk samples = ~15 samples, analogous threshold.
     MIN_SAMPLE_FRACTION = 0.01
 
-    N_TOP_GENES = 8000
+    N_TOP_GENES = 15000
     # Justification: Holland et al. 2020 SCENIC protocol recommends
     # 5000-10000 HVGs. 8000 balances runtime vs coverage on 16GB RAM.
     # Sensitivity: user should test 6000 and 10000 for robustness.
@@ -140,7 +140,7 @@ class Config:
     MOA_DIRECTION = "up"  # "up" = cancer > reference; "both" = original abs()
 
     # --- Compute ---
-    NUM_WORKERS = 4
+    NUM_WORKERS = 15
 
     # --- Seed nodes from prior pipeline stages ---
     # [FIX-5] Integration with Docking/PPI results
