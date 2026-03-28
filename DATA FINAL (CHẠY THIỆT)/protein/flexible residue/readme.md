@@ -196,6 +196,7 @@ Tuy nhiên, khi flexible docking các metalloprotein với GNINA, cần phải t
 ```python ví dụ
 gnina -r "(READY) mmp9_6ela_ready_for_gnina.pdb" \
       -l 179_compounds_3D.sdf \
+      --autobox_ligand ...\
       --covalent_rec_atom A:301:ZN \
       --covalent_lig_atom_pattern '[OX1;$([O]C=O)]' \
       --covalent_lig_atom_position 6.739,10.721,31.893 \
