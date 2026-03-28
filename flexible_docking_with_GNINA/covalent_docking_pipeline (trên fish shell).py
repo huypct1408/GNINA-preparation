@@ -1,38 +1,62 @@
-
-
-```
 # ============================================================
-# 🧬 GNINA Flexible COVALENT Docking Pipeline v2.7.0
+# 🧬 GNINA Covalent Flexible Docking Pipeline v2.7.0
+#    Metalloprotein Mode (MMP-2 / Zn²⁺) — Linux + Fish Shell
 # ============================================================
-# Thay đổi so với v2.6.2:
-#   🔴 COVALENT DOCKING MODE: -cnn_scoring none
-#       CNN models chưa calibrated cho covalent docking.
-#       Toàn bộ scoring chuyển sang Vinardo (classical).
 #
-#   🔴 CMD: --cnn_scoring none, --scoring vinardo,
-#       --pose_sort_order 0 (sort by affinity)
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  CHANGELOG v2.6.2 → v2.7.0                                 ║
+# ╠══════════════════════════════════════════════════════════════╣
+# ║                                                              ║
+# ║  🔴 FIX 1 — SCORING FUNCTION:                               ║
+# ║     XÓA: --cnn_scoring rescore, --cnn_empirical_weight 1.0  ║
+# ║     THÊM: --cnn_scoring none                                ║
+# ║     Lý do: CNN của GNINA được huấn luyện trên PDBbind —     ║
+# ║     tập dữ liệu chủ yếu non-covalent. Mô hình CHƯA học    ║
+# ║     được coordination bond geometry (Zn²⁺-carboxylate).     ║
+# ║     CNN scores sẽ trả về giá trị vô nghĩa hoặc penalty     ║
+# ║     SAI cho các pose đúng → ranking bị hỏng.                ║
+# ║     Ref: GNINA docs recommend --cnn_scoring none cho        ║
+# ║     covalent docking.                                        ║
+# ║                                                              ║
+# ║  🔴 FIX 2 — POSE SORT ORDER:                                ║
+# ║     XÓA: --pose_sort_order Energy (viết hoa — GNINA có thể  ║
+# ║          không nhận diện)                                    ║
+# ║     THÊM: --pose_sort_order energy (lowercase chuẩn)        ║
+# ║     Khi CNN off, "energy" = xếp theo minimizedAffinity.     ║
+# ║                                                              ║
+# ║  🔴 FIX 3 — SCORING ENGINE:                                 ║
+# ║     KHÔNG khai báo --scoring vinardo.                        ║
+# ║     Giữ GNINA default = Vina scoring function.              ║
+# ║     Lý do: Vinardo có Van der Waals radius cực kỳ khắt khe, ║
+# ║     phạt steric clashes nặng hơn Vina gấp nhiều lần.        ║
+# ║     Ligand bị neo tọa độ vào Zn²⁺ → clash ở sampling đầu   ║
+# ║     → Vinardo đánh giá dương vô cực → UFF minimizer sụp đổ. ║
+# ║                                                              ║
+# ║  🟢 GIỮ NGUYÊN: Tất cả --covalent_* flags (đã có từ v2.6.2)║
+# ║  🟢 GIỮ NGUYÊN: classify_red_flag, split_ligands,          ║
+# ║     status management, prepare_root_folders                  ║
+# ║                                                              ║
+# ║  🔵 CẬP NHẬT OUTPUT:                                        ║
+# ║     - Ranking: minimizedAffinity (thay vì CNN_VS)           ║
+# ║     - Excel/CSV: CNN columns hiển thị "N/A (CNN off)"       ║
+# ║     - Statistics: thêm Covalent Docking Parameters           ║
+# ║     - Banner: ghi rõ Covalent Mode + CNN off                ║
+# ║                                                              ║
+# ╠══════════════════════════════════════════════════════════════╣
+# ║  SMART COMPLIANCE                                            ║
+# ║  S: Covalent docking MMP-2/Zn²⁺ với GNINA, CNN off         ║
+# ║  M: minimizedAffinity (kcal/mol), sanity flags, pose count  ║
+# ║  A: Single-GPU, exhaustiveness=64, timeout configurable     ║
+# ║  R: Metalloprotein-specific — Vina empirical only           ║
+# ║  T: Per-ligand timeout + total elapsed tracking             ║
+# ║                                                              ║
+# ║  FAIR COMPLIANCE                                             ║
+# ║  F: Unique LIG_XXXX IDs, ligand_mapping.csv, STATUS.txt    ║
+# ║  A: Standard SDF/PDB/CSV/XLSX, CLI reproducible             ║
+# ║  I: SMILES, SDF V2000, RDKit-compatible                     ║
+# ║  R: META.txt per ligand, command.txt, full provenance       ║
+# ╚══════════════════════════════════════════════════════════════╝
 #
-#   🔴 OUTPUT: Xóa tất cả cột CNN (CNNscore, CNN_VS, 
-#       CNNaffinity). Thay bằng Vinardo affinity.
-#
-#   🔴 ARBITRATION: Đơn giản hóa — chỉ dựa trên 
-#       thermodynamic sanity (affinity).
-#
-#   🔴 RANKING: Theo minimizedAffinity (thấp hơn = tốt hơn),
-#       KHÔNG còn CNN_VS ranking.
-#
-#   FAIR compliance:
-#     F: Persistent naming (LIG_XXXX), structured dirs
-#     A: Open formats (SDF, CSV, XLSX, PDB)
-#     I: SMILES + standard prop names in SDF
-#     R: Full provenance (command.txt, META.txt, STATUS.txt)
-#
-#   SMART goals addressed:
-#     S: Covalent flexible docking with Vinardo scoring
-#     M: Affinity (kcal/mol) as sole quantitative metric
-#     A: Timeout-protected, GPU-accelerated minimization
-#     R: Scientifically justified (CNN not calibrated)
-#     T: Per-ligand timeout + batch progress tracking
 # ============================================================
 
 import os
@@ -47,7 +71,7 @@ from pathlib import Path
 from rdkit import Chem
 
 # =============================================================
-# .env loading + LD_LIBRARY_PATH
+# .env loading + LD_LIBRARY_PATH đảm bảo
 # =============================================================
 NOTEBOOK_DIR = Path.cwd()
 
@@ -90,52 +114,23 @@ PROTEIN_PATH = _resolve_path(
 )
 REF_LIGAND = _resolve_path("REF_LIGAND", f"{BASE_DIR}/data/ref_ligand.sdf")
 LIGAND_SDF = _resolve_path("LIGAND_SDF", f"{BASE_DIR}/data/ligands_prepared.sdf")
-FLEX_RESIDUES = "A:7,A:83,A:130"
+FLEX_RESIDUES = "A:180,A:181,A:215,A:235,A:240"
 SEED = "42"
 GPU_DEVICE = os.environ.get("GNINA_GPU_DEVICE", "0")
 
 # ================================================================
-# [v2.7.0] Scoring mode — COVALENT
+# Arbitration thresholds — Thermodynamic Sanity Only
 # ================================================================
-# CNN models chưa được calibrated cho covalent docking.
-# Nguồn: GNINA runtime warning + Ragoza et al. 2022
-# → Dùng Vinardo (classical empirical scoring function)
-# → Pose sort by affinity (lower = better binding)
-SCORING_MODE = "default"         # Classical scoring function
-CNN_SCORING = "none"             # Tắt CNN hoàn toàn
-POSE_SORT_ORDER = "Energy"           # Sort by affinity column (default Vina/Vinardo)
-
-# ================================================================
-# Arbitration thresholds — [v2.7.0] Chỉ affinity-based
-# ================================================================
-# Không còn CNN_VS, CNNscore → chỉ dùng Vinardo affinity
-# để đánh giá thermodynamic sanity.
+# [v2.7.0] CNN_VS: KHÔNG có ngưỡng (CNN đã tắt cho covalent mode).
 #
-# SMART justification:
-#   S: Flag ligands with physically meaningless binding
-#   M: Thresholds in kcal/mol — universally measurable
-#   A: Conservative thresholds based on literature
-#   R: Aligned with Vinardo scoring range
-#   T: Applied automatically at summary generation
-RED_FLAG_AFFINITY_POOR = -6.5    # kcal/mol — gắn kết quá yếu
-RED_FLAG_AFFINITY_MARGINAL = -7.0  # kcal/mol — marginal (info only)
-
+# Red Flag chỉ dựa trên thermodynamic sanity:
+#   🟡 POSITIVE_AFFINITY: affinity > 0 (repulsive, vô nghĩa vật lý)
+#   🟠 POOR_AFFINITY: affinity ≥ threshold (gắn kết quá yếu)
 # ================================================================
-# [v2.7.0] Vinardo affinity interpretation guide
-# ================================================================
-# Vinardo affinity (kcal/mol) — lower (more negative) = better
-#   < -10.0 : Excellent (very strong predicted binding)
-#   -10.0 to -8.0 : Good (strong binding, drug-like)
-#   -8.0 to -7.0 : Moderate (worth investigating)
-#   -7.0 to -6.5 : Marginal (weak, needs optimization)
-#   > -6.5 : Poor (likely not viable)
-#   > 0 : Repulsive (physically meaningless)
-AFFINITY_EXCELLENT = -10.0
-AFFINITY_GOOD = -8.0
-AFFINITY_MODERATE = -7.0
+RED_FLAG_AFFINITY_POOR = -6.5
 
 # =====================================================
-# GNINA timeout
+# GNINA timeout — configurable via .env
 # =====================================================
 GNINA_TIMEOUT_SEC = int(os.environ.get("GNINA_TIMEOUT_SEC", "3600"))
 
@@ -160,6 +155,7 @@ STATUS_FAILED = "FAILED"
 # =========================
 def _get_subprocess_env() -> dict:
     env = os.environ.copy()
+
     conda_prefix = env.get("CONDA_PREFIX", "")
     if conda_prefix:
         conda_lib = os.path.join(conda_prefix, "lib")
@@ -168,11 +164,16 @@ def _get_subprocess_env() -> dict:
             env["LD_LIBRARY_PATH"] = (
                 f"{conda_lib}:{current_ld}" if current_ld else conda_lib
             )
+
+    cuda_vis = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if cuda_vis is not None:
+        env["CUDA_VISIBLE_DEVICES"] = cuda_vis
+
     return env
 
 
 # =========================
-# STATUS MANAGEMENT — giữ nguyên
+# STATUS MANAGEMENT
 # =========================
 def write_status(lig_root: str, status: str, **kwargs):
     status_file = os.path.join(lig_root, "STATUS.txt")
@@ -182,10 +183,6 @@ def write_status(lig_root: str, status: str, **kwargs):
             f.write(f"STATUS={status}\n")
             f.write(f"HOST={socket.gethostname()}\n")
             f.write(f"START_TIME={time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-            # [v2.7.0] FAIR — ghi scoring mode vào provenance
-            f.write(f"SCORING_MODE={SCORING_MODE}\n")
-            f.write(f"CNN_SCORING={CNN_SCORING}\n")
-            f.write(f"PIPELINE_VERSION=2.7.0\n")
     else:
         with open(status_file, "a") as f:
             f.write(f"STATUS={status}\n")
@@ -227,7 +224,7 @@ def get_status_details(lig_root: str) -> dict:
 
 
 # =========================
-# UTILS — giữ nguyên
+# UTILS
 # =========================
 def sanitize_name(name: str, max_len: int = 80) -> str:
     if not name:
@@ -242,7 +239,7 @@ def sanitize_name(name: str, max_len: int = 80) -> str:
 
 
 # =========================
-# PREPARE ROOT FOLDERS — giữ nguyên
+# PREPARE ROOT FOLDERS
 # =========================
 def prepare_root_folders():
     dirs = [
@@ -266,29 +263,9 @@ def prepare_root_folders():
         shutil.copy(REF_LIGAND, ref_dest)
         print(f"✔ Copied reference ligand to {ref_dest}")
 
-    # [v2.7.0] FAIR — ghi pipeline config vào summary
-    config_file = os.path.join(RESULTS_DIR, "summary", "pipeline_config.txt")
-    with open(config_file, "w") as f:
-        f.write(f"PIPELINE_VERSION=2.7.0\n")
-        f.write(f"DOCKING_TYPE=covalent_flexible\n")
-        f.write(f"SCORING_MODE={SCORING_MODE}\n")
-        f.write(f"CNN_SCORING={CNN_SCORING}\n")
-        f.write(f"POSE_SORT_ORDER=affinity (lower=better)\n")
-        f.write(f"FLEX_RESIDUES={FLEX_RESIDUES}\n")
-        f.write(f"SEED={SEED}\n")
-        f.write(f"EXHAUSTIVENESS=32\n")
-        f.write(f"NUM_MODES=10\n")
-        f.write(f"TIMEOUT_SEC={GNINA_TIMEOUT_SEC}\n")
-        f.write(f"RED_FLAG_AFFINITY_POOR={RED_FLAG_AFFINITY_POOR}\n")
-        f.write(f"GNINA_BIN={GNINA_BIN}\n")
-        f.write(f"PROTEIN={PROTEIN_PATH}\n")
-        f.write(f"REF_LIGAND={REF_LIGAND}\n")
-        f.write(f"GENERATED={time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-    print(f"✔ Pipeline config saved to {config_file}")
-
 
 # =========================
-# SPLIT LIGANDS — giữ nguyên
+# SPLIT LIGANDS
 # =========================
 def split_ligands(input_sdf: str, ligands_root: str) -> list:
     os.makedirs(ligands_root, exist_ok=True)
@@ -403,21 +380,18 @@ def split_ligands(input_sdf: str, ligands_root: str) -> list:
 
 
 # ================================================================
-# [v2.7.0] SCORE PARSING — Vinardo/Classical only (NO CNN)
+# SCORE PARSING
 # ================================================================
 def parse_top_poses(sdf_path: str, n: int = 3) -> list:
     """
     Extract top N poses from docked SDF.
 
-    [v2.7.0] Covalent docking mode:
-      - CNN scoring disabled → CNNscore/CNN_VS/CNNaffinity = None
-      - Poses sorted by minimizedAffinity (lower = better)
-      - Only classical scoring properties extracted:
-          minimizedAffinity, vinardo (if present)
-    
-    FAIR compliance:
-      - Property names match GNINA SDF output exactly
-      - Pose rank preserved from file order (no re-sort)
+    [v2.7.0] Khi --cnn_scoring none:
+      - CNNscore, CNNaffinity, CNN_VS sẽ KHÔNG có trong SDF output
+      - Hàm trả về None cho các trường này (không crash)
+      - minimizedAffinity là metric chính duy nhất
+      - Thứ tự poses = thứ tự energy từ GNINA (đã sort bởi
+        --pose_sort_order energy)
     """
     try:
         suppl = Chem.SDMolSupplier(sdf_path, removeHs=False)
@@ -429,14 +403,12 @@ def parse_top_poses(sdf_path: str, n: int = 3) -> list:
 
             pose_data = {"pose_rank": pose_idx}
 
-            # [v2.7.0] Classical scoring properties only
-            # CNN properties will be None since --cnn_scoring none
             score_props = [
                 "minimizedAffinity",
+                "CNNscore",
+                "CNNaffinity",
+                "CNN_VS",
                 "vinardo",
-                "CNNscore",       # Will be None — kept for schema consistency
-                "CNNaffinity",    # Will be None — kept for schema consistency
-                "CNN_VS",         # Will be None — kept for schema consistency
             ]
 
             for prop in score_props:
@@ -461,28 +433,17 @@ def parse_top_poses(sdf_path: str, n: int = 3) -> list:
 
 
 # ================================================================
-# [v2.7.0] classify_red_flag — Affinity-only (no CNN metrics)
+# RED FLAG CLASSIFICATION — Thermodynamic Sanity Only
 # ================================================================
 def classify_red_flag(affinity) -> str:
     """
-    Thermodynamic Sanity Check — Covalent Docking Mode.
+    Arbitration Protocol — Tầng 3: Thermodynamic Sanity Check.
 
-    [v2.7.0] CNN scoring disabled → sanity check dựa hoàn toàn
-    trên Vinardo minimizedAffinity.
+    [v2.7.0] Chỉ kiểm tra affinity. CNN đã tắt hoàn toàn.
 
-    Flags:
-      🟡 POSITIVE_AFFINITY: affinity > 0 kcal/mol
-         → Repulsive interaction — physically meaningless
-      🟠 POOR_AFFINITY: affinity ≥ -6.5 kcal/mol
-         → Binding too weak for biological significance
-      (empty): Pass — thermodynamically reasonable
-
-    SMART:
-      S: Identify thermodynamically invalid poses
-      M: kcal/mol thresholds
-      A: Conservative cutoffs from literature
-      R: Consistent with Vinardo scoring range
-      T: Applied at summary generation time
+    Sanity flags:
+      🟡 POSITIVE_AFFINITY: affinity > 0 kcal/mol (repulsive)
+      🟠 POOR_AFFINITY: affinity ≥ threshold (gắn kết quá yếu)
     """
     if affinity is None:
         return ""
@@ -496,57 +457,28 @@ def classify_red_flag(affinity) -> str:
     return ""
 
 
-def classify_affinity_tier(affinity) -> str:
-    """
-    [v2.7.0] Classify affinity into interpretive tiers.
-    
-    Used in Excel for color-coding and in CSV for quick filtering.
-    Tiers based on Vinardo empirical scoring function range.
-    """
-    if affinity is None:
-        return "N/A"
-    if affinity > 0:
-        return "REPULSIVE"
-    if affinity >= RED_FLAG_AFFINITY_POOR:
-        return "POOR"
-    if affinity >= AFFINITY_MODERATE:
-        return "MARGINAL"
-    if affinity >= AFFINITY_GOOD:
-        return "MODERATE"
-    if affinity >= AFFINITY_EXCELLENT:
-        return "GOOD"
-    return "EXCELLENT"
-
-
 def get_best_pose_summary(sdf_path: str) -> dict:
     """
-    [v2.7.0] Lấy pose tốt nhất (pose 1 = affinity thấp nhất)
-    và tính sanity flag.
-    
-    Với --cnn_scoring none, pose 1 là pose có affinity thấp nhất
-    (--pose_sort_order 0 = sort by first scoring column = affinity).
+    Lấy pose tốt nhất (pose 1 = energy thấp nhất) và tính red flag.
     """
     poses = parse_top_poses(sdf_path, n=1)
     if not poses:
         return {
+            "CNNscore": None,
+            "CNN_VS": None,
+            "CNNaffinity": None,
             "minimizedAffinity": None,
-            "vinardo": None,
             "red_flag": "",
-            "affinity_tier": "N/A",
         }
 
     best = poses[0]
-    aff = best.get("minimizedAffinity")
-    best["red_flag"] = classify_red_flag(aff)
-    best["affinity_tier"] = classify_affinity_tier(aff)
+    best["red_flag"] = classify_red_flag(best.get("minimizedAffinity"))
     return best
 
 
-# ================================================================
-# parse_best_score — giữ nguyên logic, chỉ dùng minimizedAffinity
-# ================================================================
 def parse_best_score(sdf_path: str):
     """Extract best minimizedAffinity from docked SDF.
+
     Returns None nếu không parse được.
     """
     poses = parse_top_poses(sdf_path, n=1)
@@ -556,16 +488,17 @@ def parse_best_score(sdf_path: str):
 
 
 # ================================================================
-# [v2.7.0] RUN GNINA — Covalent docking command
+# RUN GNINA — Covalent Metalloprotein Mode
 # ================================================================
 def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
-    """Run GNINA covalent flexible docking for a single ligand.
+    """Run GNINA covalent docking for a single ligand.
 
-    [v2.7.0] Thay đổi so với v2.6.2:
-      - --cnn_scoring none (CNN not calibrated for covalent)
-      - --scoring vinardo (classical empirical scoring)
-      - --pose_sort_order 0 (sort by affinity, not CNNscore)
-      - Removed --cnn_empirical_weight
+    [v2.7.0] Covalent metalloprotein configuration:
+      - --cnn_scoring none (CNN chưa calibrate cho coordination bond)
+      - --pose_sort_order energy (xếp theo minimizedAffinity)
+      - Scoring function: Vina default (KHÔNG dùng Vinardo)
+      - Tất cả --covalent_* flags: GIỮ NGUYÊN
+      - timeout=GNINA_TIMEOUT_SEC (configurable)
     """
     lig_id = ligand_info["lig_id"]
     lig_root = ligand_info["lig_root"]
@@ -587,49 +520,95 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
     print(f"\n🔄 [{idx}/{total}] Docking {lig_id} ...")
     start = time.time()
 
-    # ── [v2.7.0] COVALENT DOCKING COMMAND ──
-    # Key changes from v2.6.2:
-    #   1. --cnn_scoring none     (was: --cnn_scoring rescore)
-    #   2. --scoring vinardo      (explicit classical scoring)
-    #   3. --pose_sort_order 0    (was: --pose_sort_order CNNscore)
-    #   4. REMOVED: --cnn_empirical_weight 1.0
+    # ══════════════════════════════════════════════════════════
+    # GNINA COMMAND — v2.7.0 Covalent Metalloprotein
+    # ══════════════════════════════════════════════════════════
     cmd = [
         GNINA_BIN,
+        # ── Receptor & Ligand ──
         "-r",
         f"{RESULTS_DIR}/protein/receptor.pdb",
         "-l",
         ligand_sdf,
+        # ── Search space (autobox from reference ligand) ──
         "--autobox_ligand",
         f"{RESULTS_DIR}/reference/ref_ligand.sdf",
         "--autobox_add",
         "5",
         "--autobox_extend",
         "1",
+        # ── Flexible residues ──
         "--flexres",
         FLEX_RESIDUES,
+        # ── Sampling parameters ──
         "--num_modes",
         "10",
         "--exhaustiveness",
         "64",
-        # Thêm vô các function liên quan tới covalent docking
-        # ── [THÊM VÀO ĐÂY] KHÓA TỌA ĐỘ KIM LOẠI (COVALENT DOCKING) ──
-        "--covalent_rec_atom", "A:301:ZN",
-        "--covalent_lig_atom_pattern", "[OX1;$([O]C=O)]",
-        "--covalent_lig_atom_position", "6.739,10.721,31.893",
+        # ──────────────────────────────────────────────────────
+        # COVALENT ANCHORING BLOCK
+        # Target: MMP-2 catalytic Zn²⁺ (residue A:301)
+        # Ligand anchor: carboxylate oxygen [OX1;$([O]C=O)]
+        # Coordinates: from PLIP analysis of PDB 7XJO
+        #
+        # --covalent_rec_atom: Chỉ định nguyên tử receptor làm
+        #   mỏ neo (Zn²⁺ trong chuỗi A, residue 301)
+        # --covalent_lig_atom_pattern: SMARTS pattern xác định
+        #   nguyên tử ligand sẽ gắn vào mỏ neo
+        # --covalent_lig_atom_position: Tọa độ 3D (Å) mà
+        #   nguyên tử ligand phải nằm tại
+        # --covalent_fix_lig_atom_position: Khóa cứng tọa độ
+        #   nguyên tử neo trong suốt quá trình sampling
+        # --covalent_optimize_lig: Cho phép tối ưu phần còn
+        #   lại của ligand sau khi neo
+        # ──────────────────────────────────────────────────────
+        "--covalent_rec_atom",
+        "A:301:ZN",
+        "--covalent_lig_atom_pattern",
+        "[OX1;$([O]C=O)]",
+        "--covalent_lig_atom_position",
+        "6.739,10.721,31.893",
         "--covalent_fix_lig_atom_position",
         "--covalent_optimize_lig",
-        # ── [v2.7.0] Classical scoring only ──
-        "--scoring",
-        SCORING_MODE,              # default hoặc vina
+        # ──────────────────────────────────────────────────────
+        # SCORING CONFIGURATION — v2.7.0
+        #
+        # --cnn_scoring none:
+        #   CNN của GNINA (CrossDock2020/PDBbind training set)
+        #   CHƯA được huấn luyện cho:
+        #     ① Coordination bonds (Zn²⁺-O, Zn²⁺-N)
+        #     ② Covalent attachment geometry
+        #     ③ Metal-mediated interactions
+        #   Khi bật CNN cho covalent metalloprotein docking:
+        #     - CNNscore trả về giá trị KHÔNG ĐÁNG TIN CẬY
+        #     - CNN có thể penalty pose đúng vì geometry "lạ"
+        #     - Pose ranking bị nhiễu → top poses sai
+        #   → Tắt CNN, chỉ dùng Vina empirical scoring.
+        #
+        # KHÔNG khai báo --scoring vinardo:
+        #   Vinardo sử dụng Van der Waals radius cực kỳ khắt
+        #   khe. Khi ligand bị neo tọa độ vào Zn²⁺:
+        #     - Sampling đầu CHẮC CHẮN có steric clashes
+        #     - Vinardo phạt → energy dương vô cực
+        #     - UFF minimizer nhận input quá lớn → sụp đổ
+        #   Vina default bao dung hơn → minimizer hội tụ.
+        #
+        # --pose_sort_order energy:
+        #   Khi CNN off, không có CNNscore để sort.
+        #   "energy" = sort theo minimizedAffinity:
+        #     - Giá trị càng âm = gắn kết càng mạnh
+        #     - Pose 1 = pose năng lượng thấp nhất (tốt nhất)
+        # ──────────────────────────────────────────────────────
         "--cnn_scoring",
-        CNN_SCORING,               # none
+        "none",
         "--pose_sort_order",
-        POSE_SORT_ORDER,           # Energy (affinity)
-        # ── GPU still used for minimization ──
+        "energy",
+        # ── Hardware ──
         "--device",
         GPU_DEVICE,
         "--seed",
         SEED,
+        # ── Output ──
         "--atom_term_data",
         "-o",
         out_lig,
@@ -639,12 +618,8 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
         log_file,
     ]
 
-    # [v2.7.0] FAIR — ghi command đầy đủ cho reproducibility
+    # ── FAIR: Lưu command để reproducibility ──
     with open(cmd_file, "w") as f:
-        f.write(f"# GNINA Covalent Docking — Pipeline v2.7.0\n")
-        f.write(f"# Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"# Scoring: {SCORING_MODE} (CNN disabled)\n")
-        f.write(f"# Pose sort: affinity (lower = better)\n\n")
         f.write(" \\\n    ".join(cmd))
 
     try:
@@ -676,10 +651,9 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
         )
 
         score_str = f"{best_score:.4f}" if best_score is not None else "N/A"
-        tier = classify_affinity_tier(best_score)
         print(
             f"✅ [{idx}/{total}] {lig_id} DONE in {elapsed:.2f} min"
-            f" (affinity: {score_str} [{tier}])"
+            f" (affinity: {score_str})"
         )
         return True
 
@@ -725,7 +699,7 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
 
 
 # ================================================================
-# [v2.7.0] EXCEL SUMMARY — Covalent docking (Vinardo only)
+# EXCEL / CSV SUMMARY — v2.7.0 Covalent Mode
 # ================================================================
 def generate_excel_summary(ligands: list, summary_dir: str):
     try:
@@ -760,37 +734,55 @@ def generate_excel_summary(ligands: list, summary_dir: str):
                 "status": status,
                 "elapsed_min": details.get("ELAPSED_MIN", ""),
                 "top_poses": top_poses,
+                "best_CNN_VS": best_pose.get("CNN_VS"),
+                "best_CNNscore": best_pose.get("CNNscore"),
+                "best_CNNaffinity": best_pose.get("CNNaffinity"),
                 "best_affinity": best_pose.get("minimizedAffinity"),
-                "best_vinardo": best_pose.get("vinardo"),
-                "affinity_tier": best_pose.get("affinity_tier", "N/A"),
                 "red_flag": best_pose.get("red_flag", ""),
             }
         )
 
-    # [v2.7.0] Sort by affinity (lower = better = first)
-    results_by_affinity = sorted(
+    # ──────────────────────────────────────────────────────────────
+    # [v2.7.0] PRIMARY RANKING: minimizedAffinity (càng âm càng tốt)
+    #
+    # Khi CNN tắt, CNN_VS = None cho mọi ligand → không thể rank
+    # theo CNN_VS. Rank theo minimizedAffinity:
+    #   - Giá trị càng âm = gắn kết càng mạnh = rank cao hơn
+    #   - None values xếp cuối
+    # ──────────────────────────────────────────────────────────────
+    results_ranked = sorted(
         results,
         key=lambda x: (
-            x["best_affinity"] is None,  # None goes last
+            x["best_affinity"] is None,
             x["best_affinity"] if x["best_affinity"] is not None else 0,
         ),
     )
 
     if USE_OPENPYXL:
-        _generate_xlsx_v27(results, results_by_affinity, summary_dir)
+        _generate_xlsx_v27(results, results_ranked, summary_dir)
     else:
-        _generate_csv_fallback_v27(results_by_affinity, summary_dir)
+        _generate_csv_fallback_v27(results_ranked, summary_dir)
 
 
 def _generate_xlsx_v27(
-    results: list, results_by_affinity: list, summary_dir: str
+    results: list, results_ranked: list, summary_dir: str
 ):
+    """
+    [v2.7.0] Excel output cho Covalent Metalloprotein Docking (CNN off).
+
+    4 Sheets:
+      Sheet 1 — Intra-Ligand Poses: Top 3 poses mỗi ligand (energy sort)
+      Sheet 2 — Inter-Ligand Ranking: Ranking theo minimizedAffinity
+      Sheet 3 — Sanity Flags: Ligands vi phạm thermodynamic sanity
+      Sheet 4 — Statistics: Pipeline metadata + affinity distribution
+    """
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
 
     wb = Workbook()
 
+    # ── Shared styles ──
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill_blue = PatternFill(
         start_color="2F5496", end_color="2F5496", fill_type="solid"
@@ -810,23 +802,11 @@ def _generate_xlsx_v27(
     failed_fill = PatternFill(
         start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"
     )
-    excellent_fill = PatternFill(
-        start_color="92D050", end_color="92D050", fill_type="solid"
-    )
-    good_fill = PatternFill(
-        start_color="A9D18E", end_color="A9D18E", fill_type="solid"
-    )
-    moderate_fill = PatternFill(
-        start_color="FFEB9C", end_color="FFEB9C", fill_type="solid"
-    )
-    marginal_fill = PatternFill(
+    caution_fill = PatternFill(
         start_color="FFD93D", end_color="FFD93D", fill_type="solid"
     )
-    poor_fill = PatternFill(
+    poor_affinity_fill = PatternFill(
         start_color="FFA94D", end_color="FFA94D", fill_type="solid"
-    )
-    repulsive_fill = PatternFill(
-        start_color="FF6B6B", end_color="FF6B6B", fill_type="solid"
     )
     thin_border = Border(
         left=Side(style="thin"),
@@ -848,57 +828,58 @@ def _generate_xlsx_v27(
         for col_letter, width in widths.items():
             ws.column_dimensions[col_letter].width = width
 
-    def _get_tier_fill(tier: str):
-        """Return fill color based on affinity tier."""
-        tier_fills = {
-            "EXCELLENT": excellent_fill,
-            "GOOD": good_fill,
-            "MODERATE": moderate_fill,
-            "MARGINAL": marginal_fill,
-            "POOR": poor_fill,
-            "REPULSIVE": repulsive_fill,
-        }
-        return tier_fills.get(tier, None)
+    def _fmt_cnn(val):
+        """Format CNN value — hiển thị 'N/A (CNN off)' khi None."""
+        if val is None:
+            return "N/A (CNN off)"
+        return val
 
-    # ── SHEET 1: Intra-Ligand Poses ──
-    # [v2.7.0] No CNN columns — only affinity per pose
+    # ══════════════════════════════════════════════════════════════
+    # SHEET 1: Intra-Ligand Poses (Tầng 1)
+    # ══════════════════════════════════════════════════════════════
     ws1 = wb.active
     ws1.title = "Intra-Ligand_Poses"
 
-    ws1.merge_cells("A1:N1")
+    ws1.merge_cells("A1:S1")
     note_cell = ws1.cell(
         row=1,
         column=1,
         value=(
-            "COVALENT DOCKING — INTRA-LIGAND POSE ANALYSIS: "
-            "Poses sorted by Vinardo minimizedAffinity (lower = better). "
-            "CNN scoring DISABLED (not calibrated for covalent docking). "
-            "Pose 1 = best affinity pose."
+            "TẦNG 1 — INTRA-LIGAND POSE SELECTION (Covalent Mode): "
+            "Poses xếp theo energy (minimizedAffinity) vì CNN đã tắt "
+            "(--cnn_scoring none cho metalloprotein). "
+            "Pose 1 = pose có năng lượng gắn kết thấp nhất (tốt nhất). "
+            "Các cột CNN hiển thị N/A — không tính khi CNN off."
         ),
     )
     note_cell.font = Font(bold=True, italic=True, size=10, color="2F5496")
 
     headers_s1 = [
-        "#",                   # A
-        "ID",                  # B
-        "Original_Name",       # C
-        "Status",              # D
-        "Time_min",            # E
-        "P1_Affinity",         # F
-        "P1_Tier",             # G
-        "P1_Flag",             # H
-        "P2_Affinity",         # I
-        "P2_Tier",             # J
-        "P3_Affinity",         # K
-        "P3_Tier",             # L
-        "Dir_Name",            # M
-        "SMILES",              # N
+        "#",
+        "ID",
+        "Original_Name",
+        "Status",
+        "Time_min",
+        "P1_Affinity",
+        "P1_CNNscore",
+        "P1_CNN_VS",
+        "P1_CNNaffinity",
+        "P1_Flag",
+        "P2_Affinity",
+        "P2_CNNscore",
+        "P2_CNN_VS",
+        "P2_CNNaffinity",
+        "P3_Affinity",
+        "P3_CNNscore",
+        "P3_CNN_VS",
+        "P3_CNNaffinity",
+        "SMILES",
     ]
 
     _write_header(ws1, 2, headers_s1, header_fill_blue)
     ws1.freeze_panes = "A3"
 
-    for row_idx, data in enumerate(results_by_affinity, start=3):
+    for row_idx, data in enumerate(results_ranked, start=3):
         rank = row_idx - 2
         top_poses = data["top_poses"]
 
@@ -913,104 +894,104 @@ def _generate_xlsx_v27(
         # Pose 1
         if len(top_poses) >= 1:
             p = top_poses[0]
-            aff = p.get("minimizedAffinity")
-            tier = classify_affinity_tier(aff)
-            flag = classify_red_flag(aff)
-            row_data.extend([aff, tier, flag])
+            flag = classify_red_flag(p.get("minimizedAffinity"))
+            row_data.extend([
+                p.get("minimizedAffinity", ""),
+                _fmt_cnn(p.get("CNNscore")),
+                _fmt_cnn(p.get("CNN_VS")),
+                _fmt_cnn(p.get("CNNaffinity")),
+                flag,
+            ])
         else:
-            row_data.extend(["", "", ""])
+            row_data.extend(["", "", "", "", ""])
 
         # Pose 2
         if len(top_poses) >= 2:
             p = top_poses[1]
-            aff = p.get("minimizedAffinity")
-            tier = classify_affinity_tier(aff)
-            row_data.extend([aff, tier])
+            row_data.extend([
+                p.get("minimizedAffinity", ""),
+                _fmt_cnn(p.get("CNNscore")),
+                _fmt_cnn(p.get("CNN_VS")),
+                _fmt_cnn(p.get("CNNaffinity")),
+            ])
         else:
-            row_data.extend(["", ""])
+            row_data.extend(["", "", "", ""])
 
         # Pose 3
         if len(top_poses) >= 3:
             p = top_poses[2]
-            aff = p.get("minimizedAffinity")
-            tier = classify_affinity_tier(aff)
-            row_data.extend([aff, tier])
+            row_data.extend([
+                p.get("minimizedAffinity", ""),
+                _fmt_cnn(p.get("CNNscore")),
+                _fmt_cnn(p.get("CNN_VS")),
+                _fmt_cnn(p.get("CNNaffinity")),
+            ])
         else:
-            row_data.extend(["", ""])
+            row_data.extend(["", "", "", ""])
 
-        row_data.extend([data["lig_dirname"], data["smiles"]])
+        row_data.append(data["smiles"])
 
         for col_idx, value in enumerate(row_data, start=1):
             cell = ws1.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
-            # Status coloring
             if col_idx == 4:
                 if value == STATUS_DONE:
                     cell.fill = done_fill
                 elif value == STATUS_FAILED:
                     cell.fill = failed_fill
 
-            # Tier coloring (columns G, J, L)
-            if col_idx in (7, 10, 12):
-                tier_fill = _get_tier_fill(str(value))
-                if tier_fill:
-                    cell.fill = tier_fill
-                    if value in ("POOR", "REPULSIVE"):
-                        cell.font = Font(bold=True, color="C00000")
-
-            # Flag coloring (column H)
-            if col_idx == 8:
+            if col_idx == 10:
                 if "POSITIVE" in str(value):
-                    cell.fill = repulsive_fill
+                    cell.fill = caution_fill
                     cell.font = Font(bold=True)
                 elif "POOR" in str(value):
-                    cell.fill = poor_fill
+                    cell.fill = poor_affinity_fill
                     cell.font = Font(bold=True)
 
     _set_col_widths(ws1, {
         "A": 5, "B": 12, "C": 35, "D": 10, "E": 9,
-        "F": 13, "G": 12, "H": 22,
-        "I": 13, "J": 12,
-        "K": 13, "L": 12,
-        "M": 35, "N": 60,
+        "F": 11, "G": 15, "H": 15, "I": 15, "J": 20,
+        "K": 11, "L": 15, "M": 15, "N": 15,
+        "O": 11, "P": 15, "Q": 15, "R": 15,
+        "S": 60,
     })
 
-    # ── SHEET 2: Affinity Ranking ──
-    # [v2.7.0] Replaces CNN_VS ranking with affinity ranking
-    ws2 = wb.create_sheet(title="Affinity_Ranking")
+    # ══════════════════════════════════════════════════════════════
+    # SHEET 2: Inter-Ligand Ranking (Tầng 2)
+    # ══════════════════════════════════════════════════════════════
+    ws2 = wb.create_sheet(title="Inter-Ligand_Ranking")
 
     ws2.merge_cells("A1:I1")
     note2 = ws2.cell(
         row=1,
         column=1,
         value=(
-            "COVALENT DOCKING — AFFINITY RANKING: "
-            "Ranked by Vinardo minimizedAffinity (lower = stronger binding). "
-            "CNN scoring disabled — ranking based purely on classical "
-            "force-field scoring. "
-            "Tier: EXCELLENT(<-10) | GOOD(-10 to -8) | MODERATE(-8 to -7) "
-            "| MARGINAL(-7 to -6.5) | POOR(>-6.5) | REPULSIVE(>0)."
+            "TẦNG 2 — INTER-LIGAND RANKING (Covalent Mode — CNN off): "
+            "Xếp hạng theo minimizedAffinity (kcal/mol, càng âm càng tốt). "
+            "CNN_VS không khả dụng vì --cnn_scoring none cho metalloprotein. "
+            "Affinity là proxy duy nhất cho binding strength. "
+            "Cột Flag = Tầng 3 Thermodynamic Sanity Check."
         ),
     )
     note2.font = Font(bold=True, italic=True, size=10, color="548235")
 
     headers_s2 = [
-        "Rank",            # A
-        "ID",              # B
-        "Original_Name",   # C
-        "Affinity_kcal",   # D
-        "Tier",            # E
-        "Sanity_Flag",     # F
-        "Time_min",        # G
-        "Dir_Name",        # H
-        "SMILES",          # I
+        "Energy_Rank",
+        "ID",
+        "Original_Name",
+        "Affinity_kcal",
+        "CNNscore",
+        "CNN_VS",
+        "CNNaffinity",
+        "Sanity_Flag",
+        "SMILES",
     ]
 
     _write_header(ws2, 2, headers_s2, header_fill_green)
     ws2.freeze_panes = "A3"
 
-    top_done = [r for r in results_by_affinity if r["status"] == STATUS_DONE]
+    top_done = [r for r in results_ranked if r["status"] == STATUS_DONE][:50]
 
     for row_idx, data in enumerate(top_done, start=3):
         rank = row_idx - 2
@@ -1020,10 +1001,10 @@ def _generate_xlsx_v27(
             data["lig_id"],
             data["orig_name"],
             data["best_affinity"],
-            data["affinity_tier"],
+            _fmt_cnn(data["best_CNNscore"]),
+            _fmt_cnn(data["best_CNN_VS"]),
+            _fmt_cnn(data["best_CNNaffinity"]),
             data["red_flag"],
-            data["elapsed_min"],
-            data["lig_dirname"],
             data["smiles"],
         ]
 
@@ -1031,50 +1012,47 @@ def _generate_xlsx_v27(
             cell = ws2.cell(row=row_idx, column=col_idx, value=value)
             cell.border = thin_border
 
-            # Affinity coloring (column D)
             if col_idx == 4 and isinstance(value, (int, float)):
                 if value > 0:
-                    cell.fill = repulsive_fill
+                    cell.fill = caution_fill
                     cell.font = Font(bold=True, color="C00000")
                 elif value >= RED_FLAG_AFFINITY_POOR:
-                    cell.fill = poor_fill
+                    cell.fill = PatternFill(
+                        start_color="FFF2CC",
+                        end_color="FFF2CC",
+                        fill_type="solid",
+                    )
 
-            # Tier coloring (column E)
-            if col_idx == 5:
-                tier_fill = _get_tier_fill(str(value))
-                if tier_fill:
-                    cell.fill = tier_fill
-                    if value in ("POOR", "REPULSIVE"):
-                        cell.font = Font(bold=True, color="C00000")
-
-            # Flag coloring (column F)
-            if col_idx == 6:
+            if col_idx == 8:
                 if "POSITIVE" in str(value):
-                    cell.fill = repulsive_fill
+                    cell.fill = caution_fill
                     cell.font = Font(bold=True)
                 elif "POOR" in str(value):
-                    cell.fill = poor_fill
+                    cell.fill = poor_affinity_fill
                     cell.font = Font(bold=True)
 
     _set_col_widths(ws2, {
-        "A": 7, "B": 12, "C": 35, "D": 13, "E": 12,
-        "F": 22, "G": 9, "H": 35, "I": 60,
+        "A": 12, "B": 12, "C": 35, "D": 13, "E": 15,
+        "F": 15, "G": 15, "H": 22, "I": 60,
     })
 
-    # ── SHEET 3: Sanity Flags ──
+    # ══════════════════════════════════════════════════════════════
+    # SHEET 3: Sanity Flags (Tầng 3)
+    # ══════════════════════════════════════════════════════════════
     ws3 = wb.create_sheet(title="Sanity_Flags")
 
-    ws3.merge_cells("A1:I1")
+    ws3.merge_cells("A1:J1")
     note3 = ws3.cell(
         row=1,
         column=1,
         value=(
-            "COVALENT DOCKING — THERMODYNAMIC SANITY CHECK: "
-            "🟡 POSITIVE_AFFINITY = Affinity > 0 kcal/mol (repulsive). "
+            "TẦNG 3 — THERMODYNAMIC SANITY CHECK: "
+            "🟡 POSITIVE_AFFINITY = Affinity > 0 kcal/mol (repulsive, "
+            "vô nghĩa vật lý). "
             f"🟠 POOR_AFFINITY = Affinity ≥ {RED_FLAG_AFFINITY_POOR} "
-            "kcal/mol (too weak). "
-            "CNN metrics NOT available (disabled for covalent docking). "
-            "Manual visual inspection required for flagged ligands."
+            "kcal/mol (gắn kết quá yếu). "
+            "Các ligand này CẦN kiểm tra thủ công bằng visualisation. "
+            "CNN metrics N/A (covalent mode — CNN off)."
         ),
     )
     note3.font = Font(bold=True, italic=True, size=10, color="C00000")
@@ -1085,34 +1063,34 @@ def _generate_xlsx_v27(
         "Original_Name",
         "Flag_Type",
         "Affinity_kcal",
-        "Tier",
+        "CNNscore",
+        "CNN_VS",
+        "CNNaffinity",
         "Concern",
-        "Dir_Name",
         "SMILES",
     ]
 
     _write_header(ws3, 2, headers_s3, header_fill_red)
     ws3.freeze_panes = "A3"
 
-    flagged = [r for r in results_by_affinity if r["red_flag"]]
+    flagged = [r for r in results_ranked if r["red_flag"]]
 
     if flagged:
         for row_idx, data in enumerate(flagged, start=3):
             flag = data["red_flag"]
-            aff = data["best_affinity"]
 
             if "POSITIVE" in flag:
                 concern = (
-                    f"Affinity={aff:.2f} > 0 (repulsive). "
-                    "Ligand repelled from binding pocket — "
-                    "physically meaningless pose."
+                    f"Affinity={data['best_affinity']:.2f} > 0 (repulsive). "
+                    "Pose này vi phạm nhiệt động học cơ bản — "
+                    "ligand bị đẩy ra khỏi túi gắn."
                 )
             elif "POOR" in flag:
                 concern = (
-                    f"Affinity={aff:.2f} ≥ "
+                    f"Affinity={data['best_affinity']:.2f} ≥ "
                     f"{RED_FLAG_AFFINITY_POOR} kcal/mol. "
-                    "Binding too weak for biological significance. "
-                    "Check interactions via visualization."
+                    "Gắn kết quá yếu — không đủ ý nghĩa sinh học. "
+                    "Cần kiểm tra tương tác bằng visualisation."
                 )
             else:
                 concern = ""
@@ -1122,10 +1100,11 @@ def _generate_xlsx_v27(
                 data["lig_id"],
                 data["orig_name"],
                 flag,
-                aff,
-                data["affinity_tier"],
+                data["best_affinity"],
+                _fmt_cnn(data["best_CNNscore"]),
+                _fmt_cnn(data["best_CNN_VS"]),
+                _fmt_cnn(data["best_CNNaffinity"]),
                 concern,
-                data["lig_dirname"],
                 data["smiles"],
             ]
 
@@ -1135,24 +1114,26 @@ def _generate_xlsx_v27(
 
                 if col_idx == 4:
                     if "POSITIVE" in str(value):
-                        cell.fill = repulsive_fill
+                        cell.fill = caution_fill
                         cell.font = Font(bold=True)
                     elif "POOR" in str(value):
-                        cell.fill = poor_fill
+                        cell.fill = poor_affinity_fill
                         cell.font = Font(bold=True)
     else:
         ws3.cell(
             row=3,
             column=1,
-            value="✅ No flagged ligands — all pass thermodynamic sanity check.",
+            value="✅ Không có ligand nào bị gắn cờ — Tất cả đều pass sanity check.",
         ).font = Font(italic=True, color="548235", size=12)
 
     _set_col_widths(ws3, {
         "A": 5, "B": 12, "C": 35, "D": 22, "E": 13,
-        "F": 12, "G": 60, "H": 35, "I": 60,
+        "F": 15, "G": 15, "H": 15, "I": 60, "J": 60,
     })
 
-    # ── SHEET 4: Statistics ──
+    # ══════════════════════════════════════════════════════════════
+    # SHEET 4: Statistics — Pipeline Metadata + Distributions
+    # ══════════════════════════════════════════════════════════════
     ws4 = wb.create_sheet(title="Statistics")
 
     total = len(results)
@@ -1160,23 +1141,14 @@ def _generate_xlsx_v27(
     failed = sum(1 for r in results if r["status"] == STATUS_FAILED)
     pending = sum(1 for r in results if r["status"] == STATUS_PENDING)
 
-    affinities = [
-        r["best_affinity"]
-        for r in results
-        if r["best_affinity"] is not None
-    ]
+    done_results = [r for r in results if r["best_affinity"] is not None]
+    affinities = [r["best_affinity"] for r in done_results]
 
     n_poor = sum(1 for r in results if "POOR" in r.get("red_flag", ""))
     n_positive = sum(
         1 for r in results if "POSITIVE" in r.get("red_flag", "")
     )
     n_flagged = n_poor + n_positive
-
-    # Count tiers
-    tier_counts = {}
-    for r in results:
-        t = r.get("affinity_tier", "N/A")
-        tier_counts[t] = tier_counts.get(t, 0) + 1
 
     n_timeout = sum(
         1
@@ -1191,29 +1163,50 @@ def _generate_xlsx_v27(
 
     stats = [
         ("═══ PIPELINE OVERVIEW ═══", ""),
-        ("Pipeline Version", "2.7.0 — Covalent Docking"),
-        ("Docking Type", "Flexible Covalent (Vinardo)"),
-        ("CNN Scoring", "DISABLED (not calibrated for covalent)"),
-        ("Scoring Function", SCORING_MODE),
-        ("Pose Sort Order", "minimizedAffinity (lower = better)"),
+        ("Pipeline Version", "v2.7.0 — Covalent Metalloprotein"),
+        ("Docking Mode", "Covalent Flexible (--covalent_fix_lig_atom_position)"),
+        ("Scoring Function", "Vina (GNINA default — CNN off)"),
+        ("CNN Scoring", "DISABLED (--cnn_scoring none)"),
+        (
+            "Rationale",
+            "CNN not trained on coordination bonds; "
+            "scores unreliable for Zn²⁺ metalloprotein",
+        ),
+        ("Pose Sort Order", "energy (minimizedAffinity)"),
         ("Total Ligands", total),
         ("Completed", done),
         ("Failed", failed),
         ("  ↳ of which TIMEOUT", n_timeout),
         ("Pending", pending),
-        ("GNINA Timeout Setting", f"{GNINA_TIMEOUT_SEC}s ({GNINA_TIMEOUT_SEC/60:.0f}min)"),
-        ("", ""),
-        ("═══ AFFINITY DISTRIBUTION (Vinardo) ═══", ""),
         (
-            "Best Affinity (kcal/mol)",
+            "GNINA Timeout Setting",
+            f"{GNINA_TIMEOUT_SEC}s ({GNINA_TIMEOUT_SEC/60:.0f}min)",
+        ),
+        ("", ""),
+        ("═══ COVALENT DOCKING PARAMETERS ═══", ""),
+        ("Receptor Anchor Atom", "A:301:ZN"),
+        ("Ligand Atom Pattern", "[OX1;$([O]C=O)]"),
+        ("Anchor Position (Å)", "6.739, 10.721, 31.893"),
+        ("Fix Ligand Atom Position", "YES"),
+        ("Optimize Ligand", "YES"),
+        ("Flexible Residues", FLEX_RESIDUES),
+        ("Autobox Add (Å)", "5"),
+        ("Autobox Extend", "1"),
+        ("Exhaustiveness", "64"),
+        ("Num Modes", "10"),
+        ("Random Seed", SEED),
+        ("", ""),
+        ("═══ AFFINITY DISTRIBUTION (kcal/mol) ═══", ""),
+        (
+            "Best Affinity",
             f"{min(affinities):.4f}" if affinities else "N/A",
         ),
         (
-            "Worst Affinity (kcal/mol)",
+            "Worst Affinity",
             f"{max(affinities):.4f}" if affinities else "N/A",
         ),
         (
-            "Mean Affinity (kcal/mol)",
+            "Mean Affinity",
             (
                 f"{sum(affinities) / len(affinities):.4f}"
                 if affinities
@@ -1221,58 +1214,58 @@ def _generate_xlsx_v27(
             ),
         ),
         (
-            "Median Affinity (kcal/mol)",
+            "Median Affinity",
             (
                 f"{sorted(affinities)[len(affinities)//2]:.4f}"
                 if affinities
                 else "N/A"
             ),
         ),
+        (
+            "Ligands Affinity < -10.0",
+            sum(1 for a in affinities if a < -10.0),
+        ),
+        (
+            "Ligands Affinity < -9.0",
+            sum(1 for a in affinities if a < -9.0),
+        ),
+        (
+            "Ligands Affinity < -8.0",
+            sum(1 for a in affinities if a < -8.0),
+        ),
+        (
+            "Ligands Affinity < -7.0",
+            sum(1 for a in affinities if a < -7.0),
+        ),
+        (
+            "Ligands Affinity < -6.0",
+            sum(1 for a in affinities if a < -6.0),
+        ),
         ("", ""),
-        ("═══ AFFINITY TIERS ═══", ""),
+        ("═══ CNN METRICS ═══", ""),
         (
-            f"🟢 EXCELLENT (< {AFFINITY_EXCELLENT})",
-            tier_counts.get("EXCELLENT", 0),
+            "Status",
+            "NOT AVAILABLE — CNN scoring disabled for this run",
         ),
         (
-            f"🟢 GOOD ({AFFINITY_EXCELLENT} to {AFFINITY_GOOD})",
-            tier_counts.get("GOOD", 0),
+            "Note",
+            "To enable CNN, set --cnn_scoring rescore (not recommended "
+            "for metalloprotein covalent docking)",
         ),
-        (
-            f"🟡 MODERATE ({AFFINITY_GOOD} to {AFFINITY_MODERATE})",
-            tier_counts.get("MODERATE", 0),
-        ),
-        (
-            f"🟠 MARGINAL ({AFFINITY_MODERATE} to {RED_FLAG_AFFINITY_POOR})",
-            tier_counts.get("MARGINAL", 0),
-        ),
-        (
-            f"🔴 POOR (≥ {RED_FLAG_AFFINITY_POOR})",
-            tier_counts.get("POOR", 0),
-        ),
-        ("🔴 REPULSIVE (> 0)", tier_counts.get("REPULSIVE", 0)),
         ("", ""),
-        ("═══ SANITY CHECK ═══", ""),
+        ("═══ SANITY CHECK (Tầng 3) ═══", ""),
         ("🟡 Positive Affinity (repulsive)", n_positive),
         (f"🟠 Poor Affinity (≥ {RED_FLAG_AFFINITY_POOR})", n_poor),
         ("✅ Clean (no flags)", done - n_flagged),
         ("", ""),
-        ("═══ THRESHOLDS & METHODOLOGY ═══", ""),
+        ("═══ ARBITRATION THRESHOLDS ═══", ""),
         (
             "Poor Affinity threshold",
             f"≥ {RED_FLAG_AFFINITY_POOR} kcal/mol",
         ),
         (
-            "CNN metrics",
-            "DISABLED — not calibrated for covalent docking",
-        ),
-        (
-            "Ranking method",
-            "Vinardo minimizedAffinity (classical force-field)",
-        ),
-        (
-            "Scientific basis",
-            "GNINA warning: CNN not calibrated for covalent",
+            "CNN_VS threshold",
+            "N/A — CNN disabled for covalent metalloprotein",
         ),
     ]
 
@@ -1295,7 +1288,7 @@ def _generate_xlsx_v27(
         else:
             label_cell.font = Font(bold=True)
 
-    _set_col_widths(ws4, {"A": 42, "B": 52})
+    _set_col_widths(ws4, {"A": 42, "B": 60})
 
     excel_path = os.path.join(summary_dir, "docking_summary.xlsx")
     wb.save(excel_path)
@@ -1304,35 +1297,24 @@ def _generate_xlsx_v27(
     return excel_path
 
 
-# ================================================================
-# [v2.7.0] CSV Fallback — Covalent docking format
-# ================================================================
 def _generate_csv_fallback_v27(results_sorted: list, summary_dir: str):
-    """
-    [v2.7.0] CSV output — no CNN columns, affinity-ranked.
-    
-    FAIR compliance:
-      F: Standardized column names, persistent IDs
-      A: Plain CSV — universally readable
-      I: SMILES for chemical identity, kcal/mol units
-      R: Includes tier, flag, timing for full reproducibility
-    """
+    """[v2.7.0] CSV fallback — ranking theo affinity, CNN fields ghi N/A."""
     csv_path = os.path.join(summary_dir, "docking_summary.csv")
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
-        # [v2.7.0] No CNN columns
         headers = [
-            "Rank",
+            "Energy_Rank",
             "ID",
             "Original_Name",
             "Status",
-            "Affinity_kcal_mol",
-            "Affinity_Tier",
+            "Affinity_kcal",
+            "CNNscore",
+            "CNN_VS",
+            "CNNaffinity",
             "Sanity_Flag",
             "Elapsed_Min",
-            "Dir_Name",
             "SMILES",
         ]
         writer.writerow(headers)
@@ -1344,10 +1326,23 @@ def _generate_csv_fallback_v27(results_sorted: list, summary_dir: str):
                 data["orig_name"],
                 data["status"],
                 data.get("best_affinity", ""),
-                data.get("affinity_tier", ""),
+                (
+                    data.get("best_CNNscore")
+                    if data.get("best_CNNscore") is not None
+                    else "N/A (CNN off)"
+                ),
+                (
+                    data.get("best_CNN_VS")
+                    if data.get("best_CNN_VS") is not None
+                    else "N/A (CNN off)"
+                ),
+                (
+                    data.get("best_CNNaffinity")
+                    if data.get("best_CNNaffinity") is not None
+                    else "N/A (CNN off)"
+                ),
                 data.get("red_flag", ""),
                 data["elapsed_min"],
-                data["lig_dirname"],
                 data["smiles"],
             ])
 
@@ -1356,7 +1351,7 @@ def _generate_csv_fallback_v27(results_sorted: list, summary_dir: str):
 
 
 # =========================
-# PROGRESS TRACKING — giữ nguyên
+# PROGRESS TRACKING
 # =========================
 def update_progress_csv(ligands: list, summary_dir: str):
     progress_file = os.path.join(summary_dir, "progress.csv")
@@ -1408,20 +1403,28 @@ def print_progress_summary(
 # =========================
 def main():
     print("=" * 60)
-    print("🧬 GNINA Flexible COVALENT Docking Pipeline v2.7.0")
-    print("   Scoring: Vinardo (CNN disabled — not calibrated)")
-    print("   Ranking: minimizedAffinity (lower = better)")
+    print("🧬 GNINA Covalent Flexible Docking Pipeline v2.7.0")
+    print("   Metalloprotein Mode (MMP-2 / Zn²⁺)")
+    print("   Scoring: Vina empirical only (CNN off)")
+    print("   Arbitration: Energy ranking → Sanity Check")
     print("=" * 60)
-    print(f"📂 Base dir:     {BASE_DIR}")
-    print(f"🔬 GNINA bin:    {GNINA_BIN}")
-    print(f"🧪 Protein:      {PROTEIN_PATH}")
-    print(f"📎 Ref ligand:   {REF_LIGAND}")
-    print(f"📦 Ligands:      {LIGAND_SDF}")
-    print(f"🎯 Flex res:     {FLEX_RESIDUES}")
-    print(f"📊 Scoring:      {SCORING_MODE} (--cnn_scoring {CNN_SCORING})")
-    print(f"📊 Pose sort:    affinity (--pose_sort_order {POSE_SORT_ORDER})")
-    print(f"🚩 Sanity:       Affinity≥{RED_FLAG_AFFINITY_POOR} or >0 → flagged")
-    print(f"⏱️  Timeout:      {GNINA_TIMEOUT_SEC}s ({GNINA_TIMEOUT_SEC/60:.0f} min/ligand)")
+    print(f"📂 Base dir:  {BASE_DIR}")
+    print(f"🔬 GNINA bin: {GNINA_BIN}")
+    print(f"🧪 Protein:   {PROTEIN_PATH}")
+    print(f"📎 Ref lig:   {REF_LIGAND}")
+    print(f"📦 Ligands:   {LIGAND_SDF}")
+    print(f"🎯 Flex res:  {FLEX_RESIDUES}")
+    print(f"🔗 Covalent:  A:301:ZN ← [OX1;$([O]C=O)]")
+    print(f"   Position:  6.739, 10.721, 31.893 Å")
+    print(f"🎮 CUDA_VISIBLE_DEVICES = "
+          f"{os.environ.get('CUDA_VISIBLE_DEVICES', 'NOT SET')}")
+    print(f"🎮 GNINA --device = {GPU_DEVICE}")
+    print(f"📊 CNN:       DISABLED (--cnn_scoring none)")
+    print(f"📊 Sorting:   energy (minimizedAffinity)")
+    print(f"📊 Scoring:   Vina default (NOT vinardo)")
+    print(f"🚩 Sanity:    Affinity≥{RED_FLAG_AFFINITY_POOR} or >0 → flagged")
+    print(f"⏱️  Timeout:   {GNINA_TIMEOUT_SEC}s "
+          f"({GNINA_TIMEOUT_SEC/60:.0f} min/ligand)")
     print("=" * 60)
 
     if not os.path.isfile(GNINA_BIN):
@@ -1489,20 +1492,18 @@ def main():
 
     update_progress_csv(ligands, summary_dir)
 
-    print("\n📊 Generating Excel summary (Vinardo affinity ranking)...")
+    print("\n📊 Generating Excel summary (Covalent Mode — Energy Ranking)...")
     generate_excel_summary(ligands, summary_dir)
 
     print("\n" + "=" * 60)
-    print("📊 FINAL SUMMARY — Covalent Docking v2.7.0")
+    print("📊 FINAL SUMMARY")
     print("=" * 60)
     print(f"⏱️  Total time: {elapsed_all:.2f} min")
     print(f"✅ Completed (new): {len(finished)}")
     print(f"⏭️  Skipped (cached): {len(skipped)}")
     print(f"❌ Failed: {len(failed)}")
-    print(f"📊 Scoring: {SCORING_MODE} (CNN disabled)")
     print(f"📁 Results: {RESULTS_DIR}")
     print(f"📊 Excel: {summary_dir}/docking_summary.xlsx")
-    print(f"📊 CSV:   {summary_dir}/docking_summary.csv")
     print("=" * 60)
 
     if failed:
