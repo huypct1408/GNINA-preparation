@@ -64,7 +64,7 @@ PROTEIN_PATH = _resolve_path(
 )
 REF_LIGAND = _resolve_path("REF_LIGAND", f"{BASE_DIR}/data/ref_ligand.sdf")
 LIGAND_SDF = _resolve_path("LIGAND_SDF", f"{BASE_DIR}/data/ligands_prepared.sdf")
-FLEX_RESIDUES = "A:7,A:83,A:130"
+FLEX_RESIDUES = "A:180,A:181,A:215,A:235,A:240"
 SEED = "42"
 GPU_DEVICE = os.environ.get("GNINA_GPU_DEVICE", "0")
 
@@ -115,6 +115,8 @@ STATUS_FAILED = "FAILED"
 # =========================
 def _get_subprocess_env() -> dict:
     env = os.environ.copy()
+
+    # Conda libs
     conda_prefix = env.get("CONDA_PREFIX", "")
     if conda_prefix:
         conda_lib = os.path.join(conda_prefix, "lib")
@@ -123,6 +125,12 @@ def _get_subprocess_env() -> dict:
             env["LD_LIBRARY_PATH"] = (
                 f"{conda_lib}:{current_ld}" if current_ld else conda_lib
             )
+
+    # ✅ FIX: Đảm bảo CUDA_VISIBLE_DEVICES luôn được truyền
+    cuda_vis = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if cuda_vis is not None:
+        env["CUDA_VISIBLE_DEVICES"] = cuda_vis
+
     return env
 
 
@@ -505,13 +513,23 @@ def run_gnina(ligand_info: dict, idx: int, total: int) -> bool:
         "--num_modes",
         "10",
         "--exhaustiveness",
-        "32",
+        "64",
+        #Khoa toa do cua ion kim loai, chi thuc hien cho metalloprotein
+        "--covalent_rec_atom",
+        "A:301:ZN",
+        "--covalent_lig_atom_pattern",
+        "[OX1;$([O]C=O)]",
+        "--covalent_lig_atom_position",
+        "6.739,10.721,31.893",
+        "--covalent_fix_lig_atom_position",
+        "--covalent_optimize_lig",
+        #Thiet lap ham cham diem
         "--cnn_scoring",
         "rescore",
         "--cnn_empirical_weight",
         "1.0",
         "--pose_sort_order",
-        "CNNscore",
+        "Energy", # Voi metalloprotein thi sap xep theo Energy do lop CNN cua gnina chua duoc huan luyen day du cho lien ket phoi tri, khasc voi protein thuong la xep theo CNNscore
         "--device",
         GPU_DEVICE,
         "--seed",
@@ -1278,11 +1296,14 @@ def main():
     print(f"📎 Ref lig:   {REF_LIGAND}")
     print(f"📦 Ligands:   {LIGAND_SDF}")
     print(f"🎯 Flex res:  {FLEX_RESIDUES}")
-    # [v2.6.2] Cập nhật flag display — không còn CNN_VS threshold
+    # ✅ Thêm GPU info
+    print(f"🎮 CUDA_VISIBLE_DEVICES = {os.environ.get('CUDA_VISIBLE_DEVICES', 'NOT SET')}")
+    print(f"🎮 GNINA --device = {GPU_DEVICE}")
     print(f"🚩 Sanity:    Affinity≥{RED_FLAG_AFFINITY_POOR} or >0 → flagged")
     print(f"📊 CNN_VS:    Ranking only (no absolute threshold)")
     print(f"⏱️  Timeout:   {GNINA_TIMEOUT_SEC}s ({GNINA_TIMEOUT_SEC/60:.0f} min/ligand)")
     print("=" * 60)
+    # ... phần còn lại giữ nguyên
 
     if not os.path.isfile(GNINA_BIN):
         print(f"❌ GNINA binary not found: {GNINA_BIN}")
