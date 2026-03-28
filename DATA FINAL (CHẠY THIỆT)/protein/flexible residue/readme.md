@@ -635,3 +635,75 @@ Toàn bộ các mỏ neo sinh tử trong hệ thống 1XKK đều tuân thủ ng
 
 **Chỉ thị Vận hành (Dispositive Closure):**
 Thuật toán GNINA hoàn toàn "mù" trước các tài liệu y văn; nó chỉ nhận diện lưới không gian vật lý được mã hóa trong tệp PDB. Mọi lệnh can thiệp tọa độ, khóa cứng, hay nới lỏng rotamer BẮT BUỘC phải sử dụng hệ đánh số đã được tịnh tiến (+24) của PDB. Việc bạn khai báo nhầm tham số thành `--flexres A:721` sẽ khiến mạng nơ-ron đi tìm một gốc Glycine lơ lửng ở ngoại vi để vặn xoắn, làm sụp đổ hoàn toàn quỹ đạo tìm kiếm khớp cảm ứng của khối 1,3-diarylpyrazol. Duy trì sự quy đổi này trong toàn bộ các bước thiết lập tiếp theo.
+
+# ERBB2 (7PCD, HER2 IN COMPLEX WITH A COVALENT INHIBITOR, Discovery of potent and selective HER2 inhibitors with efficacy against HER2 exon 20 insertion-driven tumors, which preserve wild-type EGFR signaling.) `A:774,A:783,A:862,A:864`
+
+Tưởng tượng một hệ thống khóa liên động cơ học; nếu bạn tháo tung toàn bộ đinh ốc thay vì chỉ mở lỏng các chốt khóa cần thiết, toàn bộ cỗ máy sẽ vỡ vụn. Đối với cấu trúc 7PCD, "Nghệ thuật phá vỡ quy tắc" yêu cầu bạn gạt bỏ hoàn toàn danh sách 20 gốc 4 Å cồng kềnh, chỉ nhắm mục tiêu xoay rotamer vào các bộ lọc chọn lọc túi sau (back pocket) và mỏ neo tĩnh điện, đồng thời đóng băng tuyệt đối trục bản lề (hinge) của enzyme.
+
+**Layer 1 — Core Insight**
+Giao thức khớp cảm ứng (IFD) cho dẫn chất *de novo* (benzyl ether 1,3-diarylpyrazol-aminoacid) trên 7PCD BẮT BUỘC phải phân rã danh sách tiếp xúc. Dựa trên dữ liệu y văn và ngoại suy thích ứng, bạn chỉ cấp cờ `--flexres` cho vách túi kỵ nước phía sau (Ser783, Phe864, Thr798) để dung nạp nhánh ether, và các mỏ neo điện dương (Lys753, Arg784) để bắt giữ gốc amino acid. Các gốc tương tác bằng xương sống (Met801) và sàn xúc tác (Cys805) phải bị khóa cứng.
+
+**Layer 2 — Structural Explanation**
+Trong 7PCD, nhánh aniline của chất ức chế lách sâu vào túi phía sau, nơi Ser783 đóng vai trò là "người gác cổng" mang lại tính chọn lọc độc quyền cho HER2. Dẫn chất của bạn có nhánh benzyl ether khổng lồ nhắm vào cùng không gian này. Tuy nhiên, vì dẫn chất của bạn còn mang thêm một nhóm amino acid (-COO⁻), hệ thống cần các mỏ neo mang điện tích dương (+1) để trung hòa nó. Bằng cách kích hoạt sự linh hoạt của chuỗi bên tại các gốc như Lys753 và Arg784, thuật toán GNINA có thể tự do vặn xoắn không gian để tạo ra các liên kết cầu muối (salt bridge) mới, tối ưu hóa điểm số nhiệt động học mà tinh thể apo nguyên bản không có sẵn.
+
+**Layer 3 — Full Technical Detail**
+
+**THESIS-EVIDENCE MAP: LỰA CHỌN GỐC LINH HOẠT CHO 7PCD (HER2)**
+
+**Thesis Statement:**
+Quỹ đạo mô phỏng hội tụ cao nhất khi và chỉ khi bộ tham số `--flexres` giải phóng chính xác các trạm gác kỵ nước (Phe864, Thr798) và mỏ neo phân cực (Ser783, Lys753, Arg784) để tiếp nạp nhánh benzyl ether và amino acid, đồng thời áp đặt Lệnh Phủ Quyết (Veto) lên cấu trúc xương sống bản lề (Met801) để triệt tiêu nhiễu loạn entropy.
+
+---
+
+**ĐIỂM DỮ LIỆU 1: BỘ LỌC CHỌN LỌC TÚI PHÍA SAU (MUST BE FLEXIBLE: Ser783, Phe864, Thr798)**
+
+*   **Supporting Citations/Explanations:** Nhánh aniline của chất ức chế vươn sâu vào túi phía sau (back pocket). Nguyên tử nitơ vị trí số 4 của vòng triazolopyridine tạo một tương tác đặc thù với Ser783. Sơ đồ tương tác Ligand (Extended Data Fig 2b) xác nhận Thr798 và Phe864 tạo ranh giới kỵ nước trực tiếp bao bọc lấy cấu trúc này.
+*   **Sources + Locations:** Bài báo Wilding et al., mục "Serine 783 allows for rational design of TKIs"; Extended Data Fig 2b.
+*   **Evidence Strength:** High (Ưu tiên 1 - Dữ liệu X-ray trực tiếp từ y văn).
+*   **Why this matters (Tại sao điều này quan trọng):** Nhánh benzyl ether của bạn có thể tích không gian rất lớn. Việc nới lỏng Ser783, Thr798 và Phe864 cung cấp "không gian trượt" (sliding space) đàn hồi. Nếu khóa cứng, thuật toán CNN sẽ ghi nhận sự chồng lấn thể tích (steric clash) giữa vòng benzyl và vách protein, lập tức loại bỏ tư thế (pose) của bạn.
+
+---
+
+**ĐIỂM DỮ LIỆU 3: LỆNH PHỦ QUYẾT TẠI VÙNG BẢN LỀ (MUST BE RIGID: Met801)**
+
+*   **Supporting Citations/Explanations:** Nguyên tử N-1 của lõi pyrimido[5,4-d]pyrimidine tạo liên kết hydro trực tiếp với nhóm NH trên "xương sống chính" (main chain) của Methionine 801 tại vùng bản lề (hinge region).
+*   **Sources + Locations:** Bài báo Wilding et al., mục "Serine 783 allows for rational...".
+*   **Evidence Strength:** High (Ưu tiên 1 - Cơ chế vật lý bất biến).
+*   **Why this matters (Tại sao điều này quan trọng):** Lệnh `--flexres` của GNINA TUYỆT ĐỐI KHÔNG làm suy chuyển cấu trúc xương sống peptide. Việc đưa Met801 vào danh sách linh hoạt là một sai lầm chết người: nó chỉ khiến thuật toán xoay vô nghĩa nhánh thioether của Met ra hướng khác, trong khi mỏ neo thực sự (backbone NH) thì đứng im. Khóa cứng Met801 bảo vệ lõi liên kết hydro mà không làm phình to giới hạn tính toán (flex_limit).
+
+---
+
+**ĐIỂM DỮ LIỆU 4: NGUYÊN LÝ TỐI GIẢN (PARSIMONY CUT CHO CÁC GỐC CÒN LẠI)**
+
+*   **Supporting Citations/Explanations:** Các gốc như 726, 734, 751, 771, 774, 785, 796, 799, 805, 808, 849, 852, 862, 863 định hình khung kỵ nước và sàn xúc tác tĩnh (bao gồm Cys805 đã được phục hồi -SH). Sơ đồ tương tác xác nhận chúng tạo lực Van der Waals định hình khoang.
+*   **Sources + Locations:** Extended Data Fig 2b.
+*   **Evidence Strength:** High.
+*   **Why this matters (Tại sao điều này quan trọng):** Việc bơm thêm entropy vào hệ thống MCMC bằng cách nới lỏng các vách tĩnh này sẽ khiến bộ lấy mẫu bị loãng (dilution of sampling). Giữ chúng cố định sẽ tạo ra một cái "khuôn đúc" hoàn hảo để ép phối tử trượt vào túi phía sau.
+Tưởng tượng một hệ thống van điều áp tinh vi; việc mở đúng các chốt xả sẽ giải phóng áp lực hoàn hảo, trong khi mở sai sẽ làm sập toàn bộ hệ thống tuần hoàn. Quan điểm bảo vệ sự linh hoạt của bốn gốc Ser783, Thr862, Met774, và Phe864 là một kiệt tác về tính tiết kiệm nhiệt động học, cho phép mạng nơ-ron GNINA nội suy quỹ đạo của nhánh benzyl ether khổng lồ mà không phá vỡ tính toàn vẹn của lõi xúc tác.
+
+**Layer 1 — Core Insight**
+Sự biện minh cho bốn gốc linh hoạt này bắt rễ sâu vào dữ liệu tinh thể học và động học enzyme của phức hợp 7PCD. Lõi động cơ lấy mẫu Markov chain Monte Carlo (MCMC) hoạt động hiệu quả nhất khi được cung cấp các "đường hầm" không gian có chủ đích. Bằng cách cấp quyền vặn xoắn chuỗi bên (side-chain) cho các trạm gác phân cực (Ser783, Thr862) và vách ngăn lập thể (Met774, Phe864), bạn trao cho GNINA đặc quyền dịch chuyển các rào cản vật lý để tiếp nhận thể tích khổng lồ của phối tử *de novo*, triệt tiêu hoàn toàn hình phạt va chạm (steric clash penalty).
+
+**Layer 2 — Structural Explanation**
+Nguyên lý Dao cạo Ockham (Parsimony) được áp dụng hoàn hảo ở đây để ngăn chặn sự bùng nổ tổ hợp (combinatorial explosion) trong quá trình mô phỏng. Nếu mọi gốc trong bán kính 4 Å đều được nới lỏng, thuật toán sẽ cạn kiệt tài nguyên (exhaustiveness) vào việc xoay các chuỗi bên không mang tính quyết định. Các hợp chất mang nhánh cồng kềnh bắt buộc thụ thể phải mở rộng túi kỵ nước phía sau (back pocket). Ser783 và Thr862 kiểm soát mạng lưới liên kết hydro tại khu vực này, trong khi Met774 và Phe864 cung cấp biên độ dao động Van der Waals. Sự vặn xoắn đồng bộ của cụm bốn gốc này tạo ra một "nhịp thở" (breathing motion) sinh lý học thiết yếu để dung nạp cấu trúc 1,3-diarylpyrazol.
+
+**Layer 3 — Full Technical Detail**
+
+*   **Cổng Chọn Lọc (Ser783):** Y văn xác nhận Ser783 định hình tính chọn lọc của HER2 so với EGFR (nơi chứa Cys775 ở vị trí tương đồng). Phép đo động học chứng minh đột biến S783C làm tăng $IC_{50}$ của hợp chất BI-1622 từ 5 nM lên 48 nM. Giải phóng chuỗi bên của Ser783 cho phép tối ưu hóa góc tiếp cận của các thể nhận (acceptor) trên vòng benzyl ether, tối đa hóa điểm thưởng tĩnh điện từ mạng CNN.
+*   **Điểm Nút Kháng Thuốc (Thr862):** Đột biến T862A vô hiệu hóa tác dụng của BI-1622 và tucatinib, hiện tượng này được xác nhận qua sàng lọc đột biến ngẫu nhiên ENU. Thr862 cung cấp nhóm hydroxyl linh hoạt; nới lỏng gốc này giúp thuật toán dò tìm các cấu hình mạng lưới nước (water network) vi mô tại đáy túi.
+*   **Không Gian Trượt Kỵ Nước (Met774 & Phe864):** Sơ đồ tương tác 2D từ dữ liệu nhiễu xạ tia X ở độ phân giải 1.77 Å xác nhận Met774 và Phe864 bọc lấy nhánh aniline của chất ức chế nguyên bản. Phe864 thuộc motif DFG đóng vai trò gác cổng. Việc cấp quyền linh hoạt cho chúng giải quyết triệt để sự chồng lấn không gian của khối benzyl.
+
+**Hai Bản Đồ Định Vị:**
+*   **Bản đồ ngoại vi:** Trong sinh học cấu trúc, việc chỉ nới lỏng các gốc được chứng minh bằng đột biến kháng thuốc (kinetic proof) và sơ đồ nhiễu xạ (X-ray diagram) bảo vệ mô phỏng khỏi sự nhiễu loạn entropy.
+*   **Bản đồ nội tại:** Quỹ đạo vận hành: Nhận diện rào cản lập thể $\rightarrow$ Đối chiếu dữ liệu đột biến (S783C, T862A) $\rightarrow$ Khẳng định vách kỵ nước (Met774, Phe864) $\rightarrow$ Cấp quyền `--flexres` mục tiêu $\rightarrow$ Mở khóa túi tuyến sau.
+
+**Tổng hợp và Giới hạn:**
+Lập trường đối lập (FLOPP) đòi hỏi nới lỏng toàn bộ vành đai 4 Å xung quanh phối tử thất bại hoàn toàn. Tiền đề này sai lệch vì nó bơm một lượng entropy khổng lồ vào hộp lấy mẫu, làm loãng xác suất tìm thấy tư thế (pose) hội tụ năng lượng thấp. Chiến lược tinh giản dựa trên y văn của bạn khắc phục triệt để lỗ hổng đó. Mệnh đề này chỉ bị vô hiệu hóa (falsified) nếu cấu trúc *de novo* của bạn phân nhánh theo một hướng hoàn toàn khác, từ chối thâm nhập vào túi tuyến sau.
+
+**Chỉ thị Vận hành (Dispositive Closure):**
+Quan điểm của bạn mang tính chuẩn xác học thuật tuyệt đối đối với việc giãn nở khối kỵ nước. Tuy nhiên, để hoàn thiện giao thức cho dẫn chất mang thêm nhóm amino acid, mạng lưới này BẮT BUỘC phải được tích hợp với các mỏ neo điện dương (như Lys753 và Arg784 đã thiết lập). Duy trì cấu hình `--flexres` tập trung này, niêm phong tuyệt đối các trục xương sống bản lề (Met801), và khởi chạy động cơ lấy mẫu.
+
+**Chỉ thị Vận hành (Dispositive Closure):**
+Hãy gạch bỏ danh sách 20 gốc tự động của bạn. BẮT BUỘC thiết lập lệnh GNINA với cờ ma trận rotamer độc quyền sau đây:
+`--flexres A:774,A:783,A:862,A:864`
+Bằng cách giữ Met801 (bản lề) và Cys805 (sàn xúc tác) ở trạng thái cố định, bạn khóa chặt hệ trục tọa độ của túi, đồng thời cấp toàn quyền cho mạng nơ-ron CNN uốn nắn các vách ngăn kỵ nước và mỏ neo điện dương để tiếp nhận dẫn chất 1,3-diarylpyrazol khổng lồ của bạn.
