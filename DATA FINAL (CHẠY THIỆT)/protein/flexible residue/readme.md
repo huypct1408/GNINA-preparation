@@ -546,3 +546,92 @@ Loại bỏ ngay lập tức danh sách 4 Å tự động của bạn. Thiết l
 Các gốc thuộc vòng phối trí Sắt (HIS367, HIS372, HIS550, ILE673, ASN554) và các gốc không có rotamer chức năng (PRO569, ALA410, ALA603) BẮT BUỘC phải duy trì trạng thái KHÓA CỨNG (RIGID). Chạy lệnh này để hội tụ quỹ đạo mô phỏng.
 
 
+# EGFR (1XKK, EGFR kinase domain complexed with a quinazoline inhibitor- GW572016, A unique structure for epidermal growth factor receptor bound to GW572016 (Lapatinib): relationships among protein conformation, inhibitor off-rate, and receptor activity in tumor cells.) `--flexres A:745,A:776,A:777,A:790,A:856`
+
+Tưởng tượng việc bạn cố gắng đưa một cỗ xe vận tải khổng lồ vào một hầm đỗ xe; nếu bạn không kích hoạt hệ thống mở rộng cửa vách phía sau, toàn bộ cấu trúc sẽ bị nghiền nát ngay lập tức. Đối với dẫn chất *de novo* mang nhánh benzyl ether cồng kềnh, việc lựa chọn gốc linh hoạt cho 1XKK BẮT BUỘC phải tuân thủ tuyệt đối dữ liệu không gian từ y văn để tránh sự sụp đổ của thuật toán lấy mẫu.
+
+**Layer 1 — Core Insight**
+Giao thức khớp cảm ứng (IFD) bằng GNINA cho dẫn chất 1,3-diarylpyrazol mang nhóm amino acid yêu cầu một ma trận linh hoạt phân mảnh. Dựa trên dữ liệu tinh thể học của 1XKK (với độ lệch đánh số +24 so với y văn gốc), bạn phải nới lỏng vách kỵ nước tuyến sau (Leu777, Phe856, Thr790) để dung nạp nhánh ether, đồng thời giải phóng mỏ neo tĩnh điện (Lys745, Arg776) để đón bắt gốc amino acid.
+
+**Layer 2 — Structural Explanation**
+Trong cấu trúc 1XKK, nhánh 3-fluorobenzyl-oxy của chất ức chế GW572016 thâm nhập sâu vào một túi kỵ nước mở rộng đặc thù. Nhánh benzyl ether trên phân tử *de novo* của bạn sở hữu thể tích không gian tương đương. Thuật toán mạng nơ-ron tích chập (CNN) cần quyền vặn xoắn chuỗi bên tại vách túi này để triệt tiêu lực đẩy Van der Waals. Tuy nhiên, thuật toán này mù lòa trước sự di chuyển của xương sống peptide và phân tử nước; do đó, các trạm tương tác cốt lõi tại vùng bản lề hoặc cầu nối nước phải bị phong tỏa hoàn toàn để bảo vệ quỹ đạo hình học nguyên thủy.
+
+**Layer 3 — Full Technical Detail**
+
+**THESIS-EVIDENCE MAP: CHIẾN LƯỢC LỰA CHỌN ROTAMER DỰA TRÊN Y VĂN CHO 1XKK**
+
+**Thesis Statement:**
+Quỹ đạo mô phỏng hội tụ tối đa khi và chỉ khi bộ tham số `--flexres` phản ánh chính xác cơ chế đàn hồi sinh lý học được y văn ghi nhận: Nới lỏng không gian trượt cho khối kỵ nước (Leu777, Phe856, Thr790), kích hoạt hố thế năng dương (Lys745, Arg776), và áp đặt lệnh phủ quyết lên các cấu trúc xương sống/cầu nước (Met793, Thr854).
+
+---
+
+**ĐIỂM DỮ LIỆU 1: KHÔNG GIAN TRƯỢT CHO NHÁNH ETHER CỒNG KỀNH (FLEX: Leu777, Phe856)**
+
+*   **Supporting Citations/Explanations:** Nhóm 3-fluorobenzyloxy chiếm giữ một túi được định hình bởi các chuỗi bên của Met742, Leu753, Thr766, Thr830, Phe832, và Leu834.
+*   **Sources + Locations:** Excerpts from 1XKK documentation.pdf (Results: Inhibitor Binding Site).
+*   **Evidence Strength:** High (Bằng chứng tinh thể học trực tiếp về dung nạp nhóm thế cồng kềnh).
+*   **Why this matters:** Nhánh benzyl ether của bạn cần toàn bộ không gian của túi phía sau (back pocket) này. Việc cấp quyền linh hoạt cho Leu753 (PDB: Leu777) và Phe832 (PDB: Phe856) cho phép thuật toán dịch chuyển các vách cản lập thể, loại bỏ hoàn toàn hình phạt va chạm (steric clash) đối với khối lượng không gian khổng lồ của phối tử.
+
+---
+
+**ĐIỂM DỮ LIỆU 2: GÁC CỔNG ĐIỀU HƯỚNG TÚI PHÍA SAU (FLEX: Thr790)**
+
+*   **Supporting Citations/Explanations:** Chuỗi bên của Thr766 hướng ra xa khỏi vòng quinoline và tạo liên kết hydro với carbonyl trên xương sống của Arg752.
+*   **Sources + Locations:** Excerpts from 1XKK documentation.pdf (Results: Comparison with OSI-774/EGFR).
+*   **Evidence Strength:** High (Cơ chế xoay chuỗi bên được cấu trúc X-ray xác nhận).
+*   **Why this matters:** Thr766 (PDB: Thr790) hoạt động như một bản lề điều hướng. Việc đưa gốc này vào danh sách `--flexres` mô phỏng chính xác sự vặn xoắn sinh lý của nó để mở đường cho nhánh benzyl ether tiến sâu vào túi kỵ nước.
+
+---
+
+**ĐIỂM DỮ LIỆU 3: KÍCH HOẠT MỎ NEO TĨNH ĐIỆN DƯƠNG (FLEX: Lys745, Arg776)**
+
+*   **Supporting Citations/Explanations:** Sự dịch chuyển của chuỗi xoắn C làm mất đi cầu muối bảo thủ Glu738-Lys721; thay vào đó, Lys721 tạo liên kết hydro với chuỗi bên của Asp831. Ngoài ra, Arg752 đóng vai trò là một điểm tựa lân cận.
+*   **Sources + Locations:**, Excerpts from 1XKK documentation.pdf.
+*   **Evidence Strength:** High (Động học phá vỡ cầu muối được ghi nhận trong y văn).
+*   **Why this matters:** Nhóm amino acid trên dẫn chất *de novo* mang điện tích âm (-COO-). Lys721 (PDB: Lys745) hiện đang liên kết với Asp831, một tàn dư của trạng thái bất hoạt. Bạn phải nới lỏng Lys745 và Arg752 (PDB: Arg776) để thuật toán bẻ gãy các liên kết cũ này, vươn chuỗi bên mang điện dương ra và thiết lập bẫy tĩnh điện mới với phối tử của bạn.
+
+---
+
+**ĐIỂM DỮ LIỆU 4: LỆNH PHỦ QUYẾT TẠI LÕI NHẬN DIỆN (RIGID: Met793, Thr854)**
+
+*   **Supporting Citations/Explanations:** N1 của quinoline tạo liên kết hydro với NH trên xương sống chính của Met769, trong khi N3 tạo liên kết hydro qua trung gian phân tử nước với chuỗi bên của Thr830.
+*   **Sources + Locations:** Excerpts from 1XKK documentation.pdf.
+*   **Evidence Strength:** High (Giới hạn vật lý của thuật toán mô phỏng).
+*   **Why this matters:** GNINA không xoay được xương sống peptide (main chain NH) và coi các phân tử nước là hạt tĩnh. Đưa Met769 (PDB: Met793) hoặc Thr830 (PDB: Thr854) vào vùng linh hoạt sẽ khiến thuật toán xoay lệch chuỗi bên một cách vô ích hoặc bẻ gãy hệ trục tọa độ tới phân tử nước. Bạn bắt buộc phải khóa cứng chúng.
+
+---
+
+**Hai Bản Đồ Định Vị:**
+*   **Bản đồ ngoại vi:** Y văn cung cấp bản đồ kho báu, nhưng hệ động lực học quyết định cách bạn đào nó. Bạn không nới lỏng toàn bộ túi liên kết; bạn chỉ nới lỏng các vách ngăn cần giãn nở và các điện cực cần thiết lập lại.
+*   **Bản đồ nội tại:** Quỹ đạo tinh chỉnh: Quét y văn 1XKK $\rightarrow$ Đồng bộ hóa độ lệch +24 PDB $\rightarrow$ Loại trừ các tương tác xương sống/nước (Met793, Thr854) $\rightarrow$ Ưu tiên không gian trượt cho benzyl ether (Leu777, Phe856, Thr790) $\rightarrow$ Giải phóng mỏ neo tĩnh điện cho amino acid (Lys745, Arg776).
+
+**Tổng hợp và Giới hạn (Falsification):**
+Quan điểm đối lập cho rằng "nên khóa cứng Lys745 để bảo vệ cấu trúc tinh thể nguyên bản" thất bại hoàn toàn. Tiền đề này sai lệch vì việc bảo tồn một cầu muối không phản ánh trạng thái động học khi một phối tử mang điện âm khổng lồ tiến vào. Kết luận yêu cầu sự giãn nở của túi kỵ nước này chỉ bị vô hiệu hóa nếu phân tử *de novo* của bạn bị cắt bỏ hoàn toàn nhánh benzyl ether, đưa hình học của nó trở về dạng phẳng nhỏ gọn tương tự chất ức chế OSI-774.
+
+**Chỉ thị Vận hành (Dispositive Closure):**
+Đình chỉ mọi thuật toán chọn vùng linh hoạt tự động. Bạn BẮT BUỘC áp dụng chính xác chuỗi tham số định tuyến không gian sau đây vào lệnh GNINA: `--flexres A:745,A:776,A:777,A:790,A:856`. Tuyệt đối không đưa các gốc Met793 và Thr854 vào cờ này. Thực thi mô phỏng để bảo đảm thuật toán CNN nội suy chính xác ái lực nhiệt động học.
+
+Tưởng tượng một cuốn sách được xuất bản với hai phiên bản: bản thứ nhất đếm số trang bắt đầu ngay từ trang bìa, trong khi bản thứ hai chỉ bắt đầu đếm từ nội dung chương một; sự sai lệch +24 đơn vị trong hệ thống tọa độ 1XKK chính là hiện tượng đếm trang tương tự trong sinh học phân tử.
+
+**Layer 1 — Core Insight**
+Sự khác biệt đánh số (Lys721 trong y văn trở thành Lys745 trong tệp PDB) xuất phát từ quy ước xử lý **peptide tín hiệu (signal peptide)** dài đúng 24 amino acid ở đầu N-terminal của thụ thể EGFR. Sự chênh lệch +24 này là một hằng số tịnh tiến tuyệt đối áp dụng cho mọi gốc amino acid được đối chiếu giữa bài báo gốc của Wood et al. (2004) và tệp dữ liệu tinh thể học 1XKK.
+
+**Layer 2 — Structural Explanation**
+*   **Hệ quy chiếu Y văn (Mature Protein):** Các nhà sinh học trong các công trình kinh điển thường sử dụng hệ đánh số dựa trên chuỗi protein "trưởng thành". Trong quá trình sinh lý thực tế, EGFR được tổng hợp với một đoạn peptide tín hiệu dài 24 amino acid để dẫn đường cho thụ thể chèn vào màng tế bào, sau đó đoạn tín hiệu này bị enzyme cắt bỏ. Bài báo đếm amino acid đầu tiên sau nhát cắt này là số 1, dẫn đến mỏ neo tĩnh điện được định danh là Lys721.
+*   **Hệ quy chiếu PDB (Precursor Protein):** Cơ sở dữ liệu PDB hiện đại chuẩn hóa mọi tọa độ theo mã định danh UniProt nguyên thủy để bảo đảm tính thống nhất toàn cầu. Thẻ `DBREF` trong tệp 1XKK chỉ định rõ nó tham chiếu đến trình tự `P00533` (EGFR_HUMAN). Khung tham chiếu UniProt đếm toàn bộ trình tự gene từ lúc vừa dịch mã, bao gồm cả 24 amino acid của đoạn tín hiệu ban đầu. Theo phương trình tuyến tính cơ bản: $721 \text{ (Bài báo)} + 24 \text{ (Signal Peptide)} = 745 \text{ (PDB)}$.
+
+**Layer 3 — Full Technical Detail**
+
+Toàn bộ các mỏ neo sinh tử trong hệ thống 1XKK đều tuân thủ nguyên lý tịnh tiến này. Việc nhận diện sai lệch sẽ dẫn đến sự sụp đổ của hệ thống khai báo tham số mô phỏng:
+*   Mỏ neo bản lề (Hinge): Met769 (Bài báo) $\rightarrow$ Met793 (PDB).
+*   Gác cổng túi kỵ nước: Thr766 (Bài báo) $\rightarrow$ Thr790 (PDB).
+*   Vách kỵ nước sâu: Leu753 (Bài báo) $\rightarrow$ Leu777 (PDB).
+*   Mỏ neo tĩnh điện dương: Lys721 (Bài báo) $\rightarrow$ Lys745 (PDB).
+*   Vòng lặp DFG: Asp831 (Bài báo) $\rightarrow$ Asp855 (PDB).
+
+**Hai Bản Đồ Định Vị:**
+*   **Bản đồ ngoại vi:** Khoảng trống nhận thức giữa văn bản sinh học (tập trung vào dạng hoạt động sinh lý tại màng tế bào) và khoa học hóa tin (tập trung vào sự đồng bộ hóa dữ liệu với hệ thống gene toàn cầu).
+*   **Bản đồ nội tại:** Quỹ đạo thao tác: Đọc tên gốc mục tiêu từ bài báo (Lys721) $\rightarrow$ Cộng thêm hằng số đoạn tín hiệu (+24) $\rightarrow$ Xác định chỉ mục thực tế trong ma trận tọa độ (745) $\rightarrow$ Xác thực chéo bằng lệnh `info atoms /A:745` để đảm bảo nhãn amino acid khớp với Lysine $\rightarrow$ Chuyển tham số vào lệnh `--flexres`.
+
+**Chỉ thị Vận hành (Dispositive Closure):**
+Thuật toán GNINA hoàn toàn "mù" trước các tài liệu y văn; nó chỉ nhận diện lưới không gian vật lý được mã hóa trong tệp PDB. Mọi lệnh can thiệp tọa độ, khóa cứng, hay nới lỏng rotamer BẮT BUỘC phải sử dụng hệ đánh số đã được tịnh tiến (+24) của PDB. Việc bạn khai báo nhầm tham số thành `--flexres A:721` sẽ khiến mạng nơ-ron đi tìm một gốc Glycine lơ lửng ở ngoại vi để vặn xoắn, làm sụp đổ hoàn toàn quỹ đạo tìm kiếm khớp cảm ứng của khối 1,3-diarylpyrazol. Duy trì sự quy đổi này trong toàn bộ các bước thiết lập tiếp theo.
