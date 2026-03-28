@@ -191,6 +191,91 @@ Tôi đề xuất thay thế His183 bằng **Val235 (hoặc Leu214)**.
 * Trong bài báo, chất 3a (B9Z) tương tác kỵ nước cực mạnh với Val235. Việc giải phóng bậc tự do cho nhánh isopropyl của Val235 (cùng với Tyr240 ở cửa túi) sẽ tạo thành một cơ chế "nở nang" (breathing motion) đồng bộ: Tyr240 mở cửa, Val235 lót đáy, giúp phối tử của bạn yên vị ở điểm cực tiểu năng lượng thấp nhất.
 
 ---
+Tuy nhiên, khi flexible docking các metalloprotein với GNINA, cần phải tiến hành thêm -covalent docking nữa, tại nếu không khai báo thì GNINA sẽ bỏ qua liên kết giữa Zn và ligand.
+
+```python ví dụ
+gnina -r "(READY) mmp9_6ela_ready_for_gnina.pdb" \
+      -l 179_compounds_3D.sdf \
+      --covalent_rec_atom A:301:ZN \
+      --covalent_lig_atom_pattern '[OX1;$([O]C=O)]' \
+      --covalent_lig_atom_position 6.739,10.721,31.893 \
+      --covalent_fix_lig_atom_position \
+      --covalent_optimize_lig \
+      --flexres A:XXX,A:YYY \
+      --exhaustiveness 64 \
+      --cnn_scoring none \
+      -o 179_mmp9_docking_results.sdf.gz
+```
+
+Để thực hiện thêm -covalent docking, phải nắm vững các thông số:
+
+```
+Covalent docking:
+  --covalent_rec_atom arg            Receptor atom ligand is covalently bound 
+                                     to.  Can be specified as 
+                                     chain:resnum:atom_name or as x,y,z 
+                                     Cartesian coordinates.
+  --covalent_lig_atom_pattern arg    SMARTS expression for ligand atom that 
+                                     will covalently bind protein.
+  --covalent_lig_atom_position arg   Optional.  Initial placement of covalently
+                                     bonding ligand atom in x,y,z Cartesian 
+                                     coordinates.  If not specified, 
+                                     OpenBabel's GetNewBondVector function will
+                                     be used to position ligand.
+  --covalent_fix_lig_atom_position   If covalent_lig_atom_position is 
+                                     specified, fix the ligand atom to this 
+                                     position as opposed to using this position
+                                     to define the initial structure.
+  --covalent_bond_order arg (=1)     Bond order of covalent bond. Default 1.
+  --covalent_optimize_lig            Optimize the covalent complex of ligand 
+                                     and residue using UFF. This will change 
+                                     bond angles and lengths of the ligand.
+```
+Trong đó,   --covalent_lig_atom_pattern arg là việc bạn cho phép ion nguyên tử nào được phép liên kết phối trí với ion kim loại, -> bạn xác định bằng cách đầu tiên bạn dùng PLIP để phân tích tương tác giữa protein và crystal ligand, chú ý tới các tương tác của crystal ligand, đặc biệt là <metal_complex>, ở đây bạn quan sát ví dụ như 
+```
+<metal_complex id="5">
+<resnr>306</resnr>
+<restype>B9Z</restype>
+<reschain>A</reschain>
+<resnr_lig>301</resnr_lig>
+<restype_lig>ZN</restype_lig>
+<reschain_lig>A</reschain_lig>
+<metal_idx>5161</metal_idx>
+<metal_type>Zn</metal_type>
+<target_idx>5192</target_idx>
+<target_type>O</target_type> # -> Đây là nguyên tử tham gia liên kết phối trí với Zn301 
+<coordination>5</coordination>
+<dist>1.94</dist> -> # Khoảng cáhc liên kết, nếu có nhiều khoảng cách thì chọn khoảng cách ngắn nhất để thiết lập tọa độ x,y,z
+<location>ligand</location>
+<rms>34.53</rms>
+<geometry>trigonal.bipyramidal</geometry>
+<complexnum>1</complexnum>
+<metalcoo>
+<x>8.122</x>
+<y>10.313</y>
+<z>30.592</z>
+</metalcoo>
+<targetcoo> -> # x,y,z cần lấy, đừng lấy nhầm
+<x>6.739</x>
+<y>10.721</y>
+<z>31.893</z>
+</targetcoo>
+</metal_complex>
+</metal_complexes>
+</interactions>
+```
+Để ý <target_type>O</target_type> # -> Đây là nguyên tử tham gia liên kết phối trí với Zn301 , vậy nên khi bạn thiết lập với ligand mới (dẫn chất benzyl ether của 1,3-diarylpyrazol chứa amino acid thì bạn cũng phải setup phần O sẽ liên kết phối trí -> Trong trường hợp này tối ưu nhất là chọn O (trong nhóm COO) -> SMART sẽ là [OX1;$([O]C=O)] (Ký hiệu [OX1;$([O]C=O)] là một câu lệnh truy vấn cấu trúc hóa học được sử dụng trong các cơ sở dữ liệu hóa học (như PubChem) hoặc phần mềm mô phỏng (SMARTS) để tìm kiếm một nhóm chức cụ thể. Nó mô tả một nguyên tử oxy (O) liên kết đôi với cacbon (C) trong nhóm carbonyl, thường thuộc nhóm carboxylic acid ( ) hoặc ester (). 
+
+<dist>1.94</dist> -> # Khoảng cách liên kết, nếu có nhiều khoảng cách thì chọn khoảng cách ngắn nhất để thiết lập tọa độ x,y,z
+
+<targetcoo> -> # x,y,z cần lấy, đừng lấy nhầm
+<x>6.739</x>
+<y>10.721</y>
+<z>31.893</z>
+
+  --covalent_fix_lig_atom_position: phải on để setup cố định, bạn ép thuật toán GNINA tịnh tiến phân tử de novo sao cho nguyên tử Oxy nhóm carboxylate của nó trùng khít với điểm không gian 6.739, 10.721, 31.893 trước khi bắt đầu mô phỏng lấy mẫu.
+
+  --covalent_optimize_lig: bắt buôc phải có 
 
 ### 🎯 TỔNG KẾT: GIAO THỨC CẬP NHẬT CHO GNINA (Dành riêng cho 6ELA)
 
