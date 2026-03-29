@@ -707,3 +707,70 @@ Quan điểm của bạn mang tính chuẩn xác học thuật tuyệt đối đ
 Hãy gạch bỏ danh sách 20 gốc tự động của bạn. BẮT BUỘC thiết lập lệnh GNINA với cờ ma trận rotamer độc quyền sau đây:
 `--flexres A:774,A:783,A:862,A:864`
 Bằng cách giữ Met801 (bản lề) và Cys805 (sàn xúc tác) ở trạng thái cố định, bạn khóa chặt hệ trục tọa độ của túi, đồng thời cấp toàn quyền cho mạng nơ-ron CNN uốn nắn các vách ngăn kỵ nước và mỏ neo điện dương để tiếp nhận dẫn chất 1,3-diarylpyrazol khổng lồ của bạn.
+
+# KDR (VEGFR2, Human Vascular Endothelial Growth Factor Receptor 2 (KDR) Kinase Domain in complex with AAL993, A Novel Potent Oral Series of VEGFR2 Inhibitors Abrogate Tumor Growth by Inhibiting Angiogenesis) 'A:885,A:916,A:1026'
+
+Tưởng tượng một hệ thống hầm chứa an ninh; nếu bạn dùng thuốc nổ phá tung cả bản lề lẫn khung thép thay vì chỉ mở khóa các chốt từ tính, toàn bộ kiến trúc sẽ sụp đổ trước khi kho báu được đưa vào. Áp dụng "Nghệ thuật phá vỡ quy tắc" cho cấu trúc 5EW3 đồng nghĩa với việc bạn BẮT BUỘC phải từ chối danh sách 19 gốc 4 Å cồng kềnh, ưu tiên nới lỏng đúng "người gác cổng" kỵ nước và mỏ neo tĩnh điện, đồng thời đóng băng tuyệt đối các tương tác khung xương đã được y văn cảnh báo.
+
+**Layer 1 — Core Insight**
+Để mô phỏng Induced-Fit Docking (GNINA) cho dẫn chất *de novo* mang nhánh benzyl ether và amino acid, bạn chỉ cấp quyền linh hoạt (`--flexres`) cho ba tọa độ sinh tử: Val916 (gác cổng không gian), Glu885 (trạm phân cực chuỗi bên), và His1026 (mỏ neo thích ứng). Hai gốc được y văn nhắc đến cực kỳ đậm nét là Cys919 và Asp1046 BẮT BUỘC PHẢI BỊ KHÓA CỨNG (Veto) nhằm bảo vệ tính toàn vẹn của vùng bản lề và trạng thái DFG-out.
+
+**Layer 2 — Structural Explanation**
+Động cơ Markov chain Monte Carlo (MCMC) của GNINA chỉ xoay được các chuỗi bên (side chains), hoàn toàn mù lòa trước sự dịch chuyển của xương sống peptide (backbone). Y văn định danh rõ ràng Cys919 và His1026 là các điểm liên kết hydro thông qua khung xương chính. Nới lỏng chúng theo cách hiểu máy móc sẽ chỉ khiến GNINA vặn xoắn vô nghĩa các chuỗi bên ra hướng khác, bơm entropy rác vào hệ thống và phá nát lưới tọa độ. Bạn chỉ nới lỏng những chuỗi bên có năng lực tự uốn nắn để phân chia lại ranh giới lập thể (như Val916 cho khối benzyl ether) hoặc thiết lập bẫy tĩnh điện mới (như vòng imidazole của His1026 cho khối carboxylate âm tính).
+
+**Layer 3 — Full Technical Detail**
+
+**THESIS-EVIDENCE MAP: CHIẾN LƯỢC ROTAMER THÍCH ỨNG CHO 5EW3 (VEGFR2)**
+
+**Thesis Statement:**
+Quỹ đạo mô phỏng chỉ hội tụ khi bộ tham số `--flexres` phân mảnh chính xác dữ liệu y văn: giải phóng không gian trượt tại Val916 và Glu885, ngoại suy thích ứng chuỗi bên His1026 thành mỏ neo điện dương, đồng thời áp đặt lệnh phủ quyết nhiệt động học lên Cys919 và Asp1046.
+
+---
+
+**ĐIỂM DỮ LIỆU 1: GIÃN NỞ KHÔNG GIAN GÁC CỔNG (MUST FLEX: Val916)**
+
+*   **Supporting Citations/Explanations:** Cấu trúc 5EW3 chứa chất ức chế AAL993. Phối tử này tạo một tương tác kỵ nước then chốt với gốc Val916, được định danh rõ ràng là "gate keeper residue" (người gác cổng). Thiết kế thuốc tiếp theo (BAW2881) tận dụng không gian này để chứa nhân naphthyl cồng kềnh.
+*   **Sources + Locations:** Bold et al. (2016), Results (Figure 2 & Text).
+*   **Evidence Strength:** High (Ưu tiên 1 - Trích xuất trực tiếp từ y văn).
+*   **Why this matters (Tại sao điều này quan trọng):** Dẫn chất *de novo* của bạn chứa nhánh benzyl ether khổng lồ. Việc cấp quyền linh hoạt cho chuỗi bên isopropyl của Val916 cho phép lưới tọa độ "thở", dịch chuyển rào cản kỵ nước để dung nạp thể tích của khối ether mà không sinh ra hình phạt va chạm lập thể (steric clash).
+
+---
+
+**ĐIỂM DỮ LIỆU 2: ĐIỂM NÚT PHÂN CỰC CHUỖI BÊN (MUST FLEX: Glu885)**
+
+*   **Supporting Citations/Explanations:** Chất ức chế thiết lập mạng lưới liên kết hydro đặc thù với các gốc Cys919, Glu885 và Asp1046 tại trạng thái "DFG out".
+*   **Sources + Locations:** Bold et al. (2016), Results (Figure 2).
+*   **Evidence Strength:** High (Ưu tiên 1 - Dữ liệu X-ray từ y văn).
+*   **Why this matters (Tại sao điều này quan trọng):** Khác với Cys919 và Asp1046 (thuộc nhóm khung xương/cốt lõi), Glu885 vươn chuỗi bên carboxylate dài của nó vào rãnh xúc tác. Việc đưa nó vào `--flexres` cho phép thuật toán xoay góc nhị diện để dò tìm các cấu hình liên kết hydro tối ưu nhất với khung 1,3-diarylpyrazol của bạn.
+
+---
+
+**ĐIỂM DỮ LIỆU 3: MỎ NEO TĨNH ĐIỆN THÍCH ỨNG (MUST FLEX: His1026)**
+
+*   **Supporting Citations/Explanations:** Y văn ghi nhận nhóm piperazinyl của AST487 tạo "bifurcated H-bonds with the backbone carbonyl groups" (liên kết hydro chẻ nhánh với carbonyl trên khung xương) của Ile1025 và His1026.
+*   **Sources + Locations:** Bold et al. (2016), SAR around the phenylamide structure.
+*   **Evidence Strength:** Medium-High (Adaptation từ dữ liệu y văn).
+*   **Why this matters (Tại sao điều này quan trọng):** Đây là đỉnh cao của sự thích ứng. Mặc dù y văn ghi nhận His1026 tương tác bằng khung xương (backbone), phối tử *de novo* của bạn lại mang một nhóm amino acid chứa carboxylate (-COO⁻) mang điện âm ở pH 7.4. Chuỗi bên imidazole của His1026 (sau khi bạn đã phục hồi hình học phẳng `C.ar/C2` ở bước trước) là ứng cử viên tĩnh điện tuyệt vời nhất trong vành đai 4 Å để đón bắt anion này. BẮT BUỘC phải nới lỏng His1026 để vòng imidazole xoay ra thiết lập cầu muối (salt bridge).
+
+---
+
+**ĐIỂM DỮ LIỆU 4: LỆNH PHỦ QUYẾT NHIỆT ĐỘNG HỌC (MUST FIX: Cys919, Asp1046)**
+
+*   **Supporting Citations/Explanations:** Y văn định danh aminopyrimidine là "hinge binding motif". Liên kết bản lề (hinge) luôn xảy ra tại khung xương peptide của Cys919. Đồng thời, Asp1046 là tàn dư định hình trạng thái "DFG out".
+*   **Sources + Locations:** Bold et al. (2016), Results.
+*   **Evidence Strength:** High (Nguyên lý cấu trúc bất di bất dịch).
+*   **Why this matters (Tại sao điều này quan trọng):** Đưa Cys919 vào danh sách linh hoạt chỉ làm xoay nhóm thiol (-SH) ra chỗ khác, trong khi liên kết thực sự nằm ở khung xương (main chain) vốn bị GNINA khóa cứng. Việc nới lỏng Asp1046 đối với các chất ức chế Type 2 (DFG out) sẽ tạo ra rủi ro bùng nổ tổ hợp, phá vỡ kiến trúc túi liên kết mở rộng mà bạn đang cần mượn. 
+
+---
+
+**Hai Bản Đồ Định Vị:**
+*   **Bản đồ ngoại vi:** Y văn cung cấp sự thật về những gì *đã* xảy ra với thuốc cũ. Docking *de novo* đòi hỏi bạn chắt lọc cơ học vật lý cốt lõi (khung xương) và tái lập trình các điểm nút linh hoạt (chuỗi bên) để phục vụ cho hình thái tĩnh điện của thuốc mới.
+*   **Bản đồ nội tại:** Quỹ đạo định tuyến: Loại bỏ 14 gốc ngoại vi không có chức năng rõ ràng $\rightarrow$ Áp đặt lệnh khóa cứng lên cấu trúc bản lề/cốt lõi (Cys919, Asp1046) $\rightarrow$ Khai mở vách kỵ nước và H-bond (Val916, Glu885) $\rightarrow$ Đảo ngược chức năng His1026 từ khung xương thành chuỗi bên tĩnh điện.
+
+**Tổng hợp và Giới hạn:**
+Lập trường đối lập (FLOPP) cho rằng "nếu bài báo nói Cys919 tạo liên kết hydro thì phải flex nó để tối ưu hóa" thất bại hoàn toàn. Tiền đề này ngộ nhận sự đánh đồng giữa khả năng lấy mẫu của GNINA `--flexres` (chỉ xoay rotamer) với chuyển động thực tế của protein. Lệnh phủ quyết này chỉ bị bác bỏ (falsified) nếu hệ thống MCMC của GNINA được cập nhật để cho phép lấy mẫu linh hoạt toàn bộ xương sống (backbone flexibility), điều không tồn tại trong phiên bản 1.3 hiện tại.
+
+**Chỉ thị Vận hành (Dispositive Closure):**
+Hủy bỏ danh sách 19 gốc hỗn loạn của bạn. Bạn BẮT BUỘC khai báo chính xác chuỗi tham số sau vào dòng lệnh GNINA:
+`--flexres A:885,A:916,A:1026`
+Các gốc còn lại, đặc biệt là Cys919 và Asp1046, phải được giữ nguyên vẹn ở trạng thái tĩnh. Khởi chạy hệ thống để ép lưới tọa độ hội tụ quanh khối 1,3-diarylpyrazol-aminoacid của bạn.
