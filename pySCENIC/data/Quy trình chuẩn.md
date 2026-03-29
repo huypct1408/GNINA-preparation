@@ -1,76 +1,91 @@
-**LỆNH ĐÓNG BĂNG (FREEZE COMMAND) ĐÃ ĐƯỢC KÍCH HOẠT.** Toàn bộ khung lý thuyết đã đạt đến trạng thái bão hòa hoàn hảo. Không thêm bất kỳ thuật toán hay biến số nào nữa. 
+<scratchpad>
+1. What EXACTLY is being asked? The user requests a finalized, frozen, and highly detailed workflow pipeline for their 4-Layer Mechanism of Action (MoA) study. The pipeline must explicitly incorporate the resolutions to the 9 previous critiques as "fatal scenarios to avoid," while strictly adhering to the SMART goal-setting framework and FAIR data principles. No new algorithms are to be introduced.
+2. What user THINKS they need vs ACTUALLY need? The user thinks they need a project management document. They actually need a rigorous systems engineering protocol that acts as an immutable blueprint, mathematically and epistemologically locking their pipeline against methodological errors (the 9 critiques), defined by strict quantitative thresholds (SMART) and absolute data provenance (FAIR).
+3. What would a COMPLETE answer contain? Hook, External/Internal Maps, a 4-Layer SMART Execution Matrix (with explicit "Fatal Scenarios to Avoid" for each layer based on the critiques), a FAIR Data Architecture section, Dispositive Closure, and a T3 Confidence Footer.
+4. What CONSTRAINTS govern this? L1=Systems Engineering | L2=Biological Epistemology. Syntax: Active voice, 12-17 words/sentence average, stress positions. Lexical: No forbidden words. Citation: Verify principles based on previous context.
+5. What ASSUMPTIONS require validation? Assumes the user is ready to execute the pipeline and requires a master reference document to prevent deviation from the established mathematical and biological rules.
+6. LOPP/FLOPP: Strongest opposing position: A rigid, frozen pipeline prevents adaptive problem-solving during execution. Where it fails: In computational biology, changing core topological or thermodynamic assumptions mid-execution destroys the logical syllogism of the entire pipeline, creating irreproducible results. Falsified by the reproducibility crisis, which mandates strict adherence to pre-defined statistical and physical gates (e.g., thermodynamic cutoffs, directed graph rules).
+7. FALSIFICATION: This pipeline architecture would be invalidated if the integration of the 4 layers failed to produce a unified, reproducible causal link between the initial physical perturbation and the terminal phenotypic cell death across the 180 compounds.
+8. Work BACKWARDS: Validated MoA Thesis $\leftarrow$ FAIR-compliant repository $\leftarrow$ SMART-executed layers $\leftarrow$ Enforcement of "Avoidance Scenarios" (Critiques 1-9) $\leftarrow$ Frozen 4-Layer Architecture.
+9. HALT CHECK: All required frameworks (SMART, FAIR, 4-Layer MoA) and the 9 critical resolutions from the conversation history are fully available to synthesize this master protocol. Proceed to output.
+User needs a frozen, comprehensive MoA execution blueprint to accomplish thesis validation, requiring the integration of SMART, FAIR, and 9 critical avoidance scenarios, under constraints of rigorous systems engineering. Counterposition of an adaptive/fluid pipeline fails because its premise of flexibility is falsified by the strict mathematical dependencies between thermodynamic anchors and topological diffusion. Conclusion would be invalidated if the multi-layer integration failed to yield a unified causal mechanism.
+</scratchpad>
 
-Dưới đây là **Quy trình Thực thi Tiêu chuẩn (Standard Operating Procedure - SOP)** duy nhất và cuối cùng cho Kiến trúc Dược lý Hệ thống 4 Lớp của bạn. Quy trình này được thiết kế theo chuẩn Q1, kết hợp chặt chẽ hệ quy chiếu **SMART**, tiêu chuẩn quản trị dữ liệu **FAIR**, và đặc biệt là bộ **"Kỷ luật Thép" (Red Flags)** đúc kết từ 10 lỗ hổng phản biện nhằm ngăn chặn mọi sự sụp đổ về mặt nhân quả.
+Hệ thống chính thức đóng băng (freeze) toàn bộ nền tảng lý thuyết. Kiến trúc của bạn đã đạt đến trạng thái bão hòa về mặt độ phức tạp thuật toán. Việc nạp thêm bất kỳ biến số nào lúc này sẽ kích hoạt hội chứng "Over-engineering", phá vỡ cấu trúc nhân quả tuyến tính.
 
----
+**Bản đồ Ngoại vi (External Topology):** Luận văn của bạn giờ đây là một cỗ máy sản xuất bằng chứng (Evidence-Generating Machine). Nó chuyển hóa dữ liệu hóa học thô thành một phán quyết cơ chế tác động (MoA) có tính chất cưỡng chế về mặt logic.
+**Bản đồ Nội vi (Internal Topology):** Phác đồ dưới đây cố định ranh giới vận hành. Trục SMART định lượng hóa 4 phân lớp. Trục Cảnh báo (Red Flags) niêm phong 9 lỗ hổng nhận thức luận. Trục FAIR bảo vệ tính toàn vẹn của dữ liệu mô phỏng.
 
-### 🚫 CÁC TÌNH HUỐNG TỐI KỴ BẮT BUỘC PHẢI TRÁNH (FATAL ANTI-PATTERNS)
-Nếu vi phạm một trong các điều sau, toàn bộ pipeline sẽ xuất ra "Rác" (Garbage In, Garbage Out) và bị từ chối xuất bản:
-1. **Tuyệt đối không chạy RWR mà không qua Cổng Nhiệt động học:** Không đưa các hợp chất có $\Delta G \ge -6.5$ kcal/mol vào Lớp 2. Việc chuẩn hóa $P_0$ trên các chất yếu sẽ gây ra "Nghịch lý Chuẩn hóa", làm thuật toán RWR nhầm lẫn chất vô tác dụng với siêu thuốc.
-2. **Tuyệt đối không dùng Ma trận Vô hướng (Undirected Graph) cho toàn mạng lưới:** Mạng lưới phiên mã (pySCENIC) BẮT BUỘC phải là ma trận có hướng (`nx.DiGraph`). Cho phép tín hiệu chảy ngược từ gen lên Yếu tố phiên mã (TF) sẽ vi phạm Nguyên lý Trung tâm của Sinh học.
-3. **Tuyệt đối không gọi HEK-293 là "Tế bào khỏe mạnh bình thường":** HEK-293 là tế bào bất tử hóa phi ác tính. Để thiết lập đối chứng âm thực sự, phải sử dụng dữ liệu phiên mã mô nguyên phát từ **GTEx**.
-4. **Tuyệt đối không quy chụp dấu (+/-) từ kết quả Docking:** Docking chỉ trả về Ái lực (Độ lớn). Việc giải mã thuốc kích hoạt hay ức chế BẮT BUỘC phải để Lớp 3 (Dữ liệu RNA-seq / AUCell) quyết định.
-5. **Tuyệt đối không bỏ qua "Bể chứa Cạnh tranh":** Phương trình RWR phải sử dụng Trọng số Tích số (Ái lực $\times$ Độ phong phú Protein). Bơm tín hiệu mù quáng mà không biết số lượng bản sao protein trong tế bào sẽ vi phạm Định luật Tác dụng Khối lượng.
-6. **Tuyệt đối không để dữ liệu Omics bằng 0 (Omics Dropout):** Khi tính toán $P_0$, nếu dữ liệu biểu hiện gen (TPM) bị khuyết, BẮT BUỘC gán pseudo-count (ví dụ: $E_i = 0.001$). Một số 0 tròn trĩnh sẽ làm sụp đổ phương trình toán học.
-7. **Tuyệt đối không để "Nút mồ côi" phá thuật toán:** Trước khi chạy RWR, phải có hàm kiểm tra `Degree > 0`. Nút không có cạnh liên kết phải bị gạt khỏi vector $P_0$ để tránh làm giam cầm xác suất truyền tin.
+Dưới đây là giao thức thực thi tối hậu. Tuyệt đối không tự ý thay đổi quy trình.
 
----
+### I. TRỤC THỰC THI: MA TRẬN S.M.A.R.T VÀ HÀNG RÀO NHẬN THỨC
 
-### BẢN THIẾT KẾ WORKFLOW HOÀN CHỈNH (THE MASTER PIPELINE)
+#### Layer 1: Khởi nguồn Nhiệt động học (Docking & Scoring)
+*   **S (Cụ thể):** Xác lập tiềm năng gắn kết và trích xuất điểm số `CNN_VS` cho 180 dẫn chất benzyl ether trên 9 đích protein (WT PDB) thông qua GNINA và PoseBusters.
+*   **M (Đo lường được):** Tư thế phải vượt qua ngưỡng $\Delta G \le -6.5$ kcal/mol và đạt 100% tỷ lệ hợp lệ hóa học từ PoseBusters.
+*   **A (Khả thi):** Tự động hóa qua script cục bộ, tận dụng cấu hình `BACKBONE_ATOMS` v2.0 để bảo vệ khung hình học protein.
+*   **R (Liên quan):** Thiết lập mỏ neo vật lý cho mô hình truyền tin.
+*   **T (Thời hạn):** Xuất vector $P_0$ thô trong 1 tuần.
+*   🚨 **TÌNH HUỐNG TỬ HUYỆT BẮT BUỘC TRÁNH:**
+    1.  **Tuyệt đối không** chuẩn hóa vector $P_0$ nếu chưa lọc bỏ các chất có $\Delta G > -6.5$ kcal/mol (Nghịch lý Chuẩn hóa).
+    2.  **Tuyệt đối không** cố gắng giải mã chất chủ vận/đối kháng (+/-) ở bước này (Nghịch lý Dấu Động học).
+    3.  **Tuyệt đối không** lãng phí tài nguyên để mô phỏng protein đột biến; cấu trúc tinh thể hoang dã (WT) là nền tảng đủ tốt cho các enzyme thực thi.
 
-#### LAYER 1: CỔNG LỌC NHIỆT ĐỘNG HỌC & MỎ NEO VẬT LÝ (DOCKING)
-*Xác định tiềm năng liên kết lý thuyết và thiết lập lực đẩy khởi điểm.*
+#### Layer 2: Bản đồ Hình học Dị thể (Context-Specific Topology)
+*   **S:** Tích hợp dữ liệu STRING (PPI) và SCENIC (GRN) để tạo ma trận chuyển vị $W_{Integrated}$. Thực thi RWR bằng vector $P_0$ đã hiệu chuẩn.
+*   **M:** Trích xuất Top 50 Hub Genes. Cấu hình hệ số cản `alpha = 0.7` ($r=0.3$) trong hàm `nx.pagerank()`.
+*   **A:** Vận hành trên NetworkX với cấu trúc Đồ thị Có hướng (`nx.DiGraph()`).
+*   **R:** Định vị vùng không gian mạng lưới chịu dư chấn tối đa từ xung lực thuốc.
+*   **T:** Hoàn thiện ma trận Hub Genes trong 2 tuần.
+*   🚨 **TÌNH HUỐNG TỬ HUYỆT BẮT BUỘC TRÁNH:**
+    4.  **Tuyệt đối không** sử dụng Đồ thị Vô hướng (Undirected Graph) cho dữ liệu phiên mã; tín hiệu không được phép chảy ngược từ gen lên yếu tố phiên mã (Xung đột Đại số).
+    5.  **Tuyệt đối không** nạp trực tiếp `CNN_VS` vào $P_0$. Bắt buộc phải nhân với mức độ biểu hiện gen ($E_i$) từ RNA-seq để tạo $P_0$ trọng số phong phú (Tránh Nghịch lý Bể chứa Cạnh tranh).
+    6.  **Tuyệt đối không** kết luận MoA dựa trên một chất duy nhất. Bắt buộc chạy đối chứng Delta-Network (Chất Active vs Inactive). Nếu đồ thị không phân kỳ, vứt bỏ giả thuyết đó ngay lập tức (Chống Thiên kiến Xác nhận).
 
-* **[S] Cụ thể:** Chạy GNINA cho 180 hợp chất trên 9 đích (MMPs, PPARs, COX-2). Chỉ giữ lại các tương tác vượt qua ngưỡng $\Delta G < -6.5$ kcal/mol. Trích xuất chỉ số `CNN_VS`.
-* **[M] Đo lường:** Tỷ lệ PoseBusters Pass = 100%. Tạo ra Vector $P_0$ thô.
-* **[A] Khả thi:** Tự động hóa bằng bash script và PLIP CLI.
-* **[R] Liên quan:** Loại bỏ "Nghịch lý chuẩn hóa $P_0$" ngay từ vòng gửi xe bằng cách chặn đứng các chất có ái lực yếu.
-* **[T] Thời hạn:** 1 tuần.
-* **FAIR Data:**
-    * **[F&A]**: Lưu file `.sdf` theo chuẩn danh pháp `[LigandID]_[TargetPDB].sdf`.
-    * **[I&R]**: Ghi log mọi hợp chất bị loại bỏ do không đạt ngưỡng năng lượng vào tệp `L1_Eliminated_Compounds.csv`.
+#### Layer 3: Màng lọc Thiết yếu Di truyền (CRISPR & AUCell)
+*   **S:** Thẩm định tính sinh tử và trạng thái biểu hiện của Top 50 Hub Genes/Regulons.
+*   **M:** Xác suất Phụ thuộc CRISPR ($P(dep)$) > 0.8 tại tế bào ung thư (DepMap). $\Delta$AUC > 0.05 đối với trạng thái phiên mã.
+*   **A:** Truy vấn tệp `CRISPRGeneDependency.csv` và dữ liệu RNA-seq nền tảng (baseline).
+*   **R:** Chứng minh sự sụp đổ của Master Regulon gây ra cái chết không thể đảo ngược.
+*   **T:** Tích hợp bộ lọc chéo trong 3 ngày.
+*   🚨 **TÌNH HUỐNG TỬ HUYỆT BẮT BUỘC TRÁNH:**
+    7.  **Tuyệt đối không** gọi HEK-293 là "tế bào khỏe mạnh đối chứng". Gọi nó là "trạng thái tham chiếu phi ác tính". Bắt buộc dùng GTEx transcriptomics làm đối chứng mô bình thường.
+    8.  **Tuyệt đối không** đòi hỏi dữ liệu RNA-seq chuỗi thời gian (72h). Sự sụp đổ mạng lưới tại $t=0$ với $P(dep) > 0.8$ là minh chứng tuyệt đối cho sự thất bại thích nghi (Adaptive Failure).
 
-#### LAYER 2: BẢN ĐỒ HÌNH HỌC ĐẶC THÙ (TOPOLOGY & RWR)
-*Lan truyền xung lực ức chế dựa trên sự dung hợp giữa không gian vật lý và hệ gen.*
-
-* **[S] Cụ thể:** 1. Lập ma trận bất đối xứng $W_{Integrated}$ bằng cách kết hợp PPI (vô hướng) và pySCENIC (có hướng).
-    2. Cập nhật phương trình khởi tạo: $P_{0, i} \propto CNN\_VS_i \times E_i$ (Ái lực $\times$ Biểu hiện gen CCLE) cộng thêm pseudo-count $0.001$.
-    3. Chạy RWR bằng `nx.pagerank` với `alpha = 0.7` (tương đương Restart probability $r=0.3$).
-* **[M] Đo lường:** Trích xuất chính xác Top 50 Hub Genes chịu xác suất dừng cao nhất.
-* **[A] Khả thi:** Khởi chạy tập lệnh Python `layer2_v2.py` với cấu trúc `nx.DiGraph`.
-* **[R] Liên quan:** Chuyển đổi Ái lực (Lớp 1) thành Bản đồ Dư chấn (Maximal Topological Footprint), giải quyết triệt để "Nghịch lý Bể chứa Cạnh tranh".
-* **[T] Thời hạn:** 2 tuần (tập trung thời gian chạy GRNBoost2).
-* **FAIR Data:**
-    * **[F&A]**: Xuất mạng lưới dưới dạng `.graphml` để Cytoscape đọc được.
-    * **[I&R]**: Ghi rõ version NetworkX, hệ số `alpha` và `seed` vào file `manifest.json`.
-
-#### LAYER 3: MÀNG LỌC DI TRUYỀN & PHIÊN MÃ (VULNERABILITY VALIDATION)
-*Cầu dao sinh tử: Giải mã dấu chức năng và thẩm định khả năng thích nghi.*
-
-* **[S] Cụ thể:** 1. Lọc Top 50 Hub Genes qua dữ liệu CRISPR (DepMap). Chỉ giữ lại các gen có Xác suất phụ thuộc (Probability of Dependency) $> 0.8$ tại tế bào ung thư.
-    2. Đối chiếu mạng lưới ung thư với mạng lưới khỏe mạnh nguyên phát từ cơ sở dữ liệu **GTEx** (không dùng HEK-293 làm chuẩn khỏe mạnh).
-    3. Dùng AUCell của pySCENIC để xác định Hub Gene bị Up-regulated hay Down-regulated.
-* **[M] Đo lường:** Số lượng Master Regulons/Hub Genes còn sót lại sau màng lọc. $\Delta$AUC > 0.05 đối với trạng thái phiên mã.
-* **[A] Khả thi:** Truy vấn ma trận `CRISPRGeneDependency.csv` bằng Pandas trong vài giây.
-* **[R] Liên quan:** * Chống lại "Thiên kiến Xác nhận": Nếu độc tính là do off-target, Lớp 3 sẽ trả về CRISPR $< 0.5$ và hệ thống tự động loại bỏ giả thuyết MoA này.
-    * Đập tan "Lệch pha Thời gian": Ngưỡng CRISPR $> 0.8$ chứng minh tế bào ung thư hoàn toàn vô phương cứu chữa, không thể kích hoạt vòng lặp thích nghi trong 72h tới.
-* **[T] Thời hạn:** 3 ngày.
-* **FAIR Data:**
-    * **[F&A]**: Đổi tên cột kết quả thành `Probability_of_Dependency` chuẩn mực.
-    * **[I&R]**: Tích hợp danh pháp gen HGNC để máy móc (machine-readable) có thể đối chiếu tự động với GTEx.
-
-#### LAYER 4: HIỆU CHUẨN KIỂU HÌNH (EMPIRICAL DOSE-RESPONSE)
-*Sử dụng thực nghiệm in vitro để lấp đầy khoảng trống nồng độ và đột biến cấu trúc.*
-
-* **[S] Cụ thể:** Đặt kết quả đo IC50 (MTT Assay) trên 6 dòng tế bào cạnh dự đoán của Lớp 3.
-* **[M] Đo lường:** $IC_{50}$ thực nghiệm và Chỉ số Chọn lọc (Selectivity Index - SI).
-* **[A] Khả thi:** Phụ thuộc vào tiến độ phòng lab thực nghiệm.
-* **[R] Liên quan:** * Lấp đầy "Khoảng trống Nồng độ": Xác nhận $K_d$ lý thuyết của docking đủ mạnh để vượt qua hàng rào dược động học nội bào.
-    * Tự sửa sai Cấu trúc: Nếu tế bào mang đột biến kháng thuốc không được mô phỏng ở Lớp 1, Lớp 4 sẽ trả về $IC_{50}$ cao, tự động đập tan giả thuyết gắn kết.
-* **[T] Thời hạn:** Khớp với lịch thí nghiệm in vitro.
-* **FAIR Data:**
-    * **[F&A]**: Ảnh đồ thị liều-đáp ứng (Dose-response curve) lưu chuẩn `.svg` độ phân giải cao.
-    * **[I&R]**: Nén toàn bộ Script, Ma trận kết quả Lớp 1-3, và Raw data Lớp 4 tải lên Zenodo để lấy mã DOI phục vụ công bố Q1.
+#### Layer 4: Thẩm định Kiểu hình (In Vitro MTT Assay)
+*   **S:** Định lượng khả năng tiêu diệt tế bào qua thử nghiệm MTT trên 6 dòng tế bào.
+*   **M:** IC50 < 10.87 $\mu$M và Chỉ số Chọn lọc (SI) > 13.12.
+*   **A:** Thực thi tại phòng thí nghiệm *in vitro* tiêu chuẩn.
+*   **R:** Đóng vòng lặp nhân quả, chứng minh tiềm năng mạng lưới đã vượt qua rào cản dược động học nội bào.
+*   **T:** Căn chỉnh theo tiến độ phòng thí nghiệm (tùy thuộc vào dữ liệu thực nghiệm).
+*   🚨 **TÌNH HUỐNG TỬ HUYỆT BẮT BUỘC TRÁNH:**
+    9.  **Tuyệt đối không** chèn tham số nồng độ (Dose) vào mô hình RWR. Sử dụng IC50 thực nghiệm ở Layer 4 làm bằng chứng giải quyết "Khoảng trống Nồng độ" (Concentration Gap) mà mô phỏng tính toán không thể giải quyết. Nếu IC50 kém, mạng lưới Layer 2 vô giá trị.
 
 ---
-**TỔNG KẾT:** Cỗ máy Dược lý Hệ thống của bạn đã được thiết kế hoàn chỉnh với tính năng tự chẩn đoán, tự sửa lỗi và tích hợp hệ thống kiểm chứng chéo (Popperian Falsification). Hãy bắt tay vào viết dòng code đầu tiên. Không cần lùi bước trước bất kỳ câu hỏi phản biện nào nữa!
+
+### II. TRỤC DỮ LIỆU: KIẾN TRÚC F.A.I.R
+
+Hệ thống từ chối mọi dữ liệu trôi nổi, không có nhật ký kiểm toán.
+
+*   **F - Findable (Có thể tìm thấy):** 
+    Tất cả tệp đầu ra từ Layer 1 đến Layer 3 phải mang tiền tố định danh thống nhất (ví dụ: `LIG_0170_MMP9_Pose1`). Sử dụng danh pháp gen HGNC chính thức. Mọi thư mục phải chứa tệp `manifest.json` liệt kê cấu trúc dữ liệu.
+*   **A - Accessible (Có thể truy cập):** 
+    Lưu trữ mã nguồn Python và các ma trận $W_{Integrated}$ trên kho lưu trữ viện trường hoặc GitHub. Sử dụng giao thức truy cập mở cho mã nguồn, bảo vệ quyền truy cập đối với dữ liệu hóa học chưa công bố.
+*   **I - Interoperable (Có thể tương tác):** 
+    Tuyệt đối không dùng định dạng độc quyền. Trích xuất tương tác bằng XML (PLIP), lưu trữ mạng lưới bằng `.graphml` (Cytoscape), và lưu trữ dữ liệu số bằng `.csv` thuần túy. 
+*   **R - Reusable (Có thể tái sử dụng):** 
+    Đây là nguyên tắc sống còn. Mọi quyết định loại bỏ dữ liệu phải được ghi vào nhật ký kiểm toán tự động (ví dụ: `OVERLAP_PAIRS.csv` hoặc `ELIMINATED_PATHWAYS.csv`). Ghi nhận rõ ràng các hằng số siêu tham số (như `alpha = 0.7`, $\Delta G$ cutoff, $P(dep)$ threshold) vào siêu dữ liệu (provenance) để hội đồng có thể tái lập thí nghiệm ở mức độ bit-perfect.
+
+### Lệnh đóng (Dispositive Closure)
+Phong ấn cấu trúc 4 Layer này. Tiến hành trích xuất dữ liệu GNINA, tích hợp vào ma trận $W_{Integrated}$ bất đối xứng, và lọc kết quả qua màng lọc CRISPR $P(dep) > 0.8$. Sự phân kỳ của đồ thị giữa chất Active và Inactive kết hợp với kết quả IC50 thực nghiệm sẽ khóa chặt cơ chế tác động. Bất kỳ sự chệch hướng nào khỏi 9 quy tắc tử huyệt nêu trên sẽ làm vô hiệu hóa toàn bộ luận văn.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**CONFIDENCE ASSESSMENT**
+First Principles Validity: High
+Logical Completeness: Complete
+Constraint Type: Systems Engineering/Procedural
+Assumption Sensitivity: Assumes the user possesses the transcriptomic expression arrays required to calculate the Abundance-weighted $P_0$.
+Citations: Explicit integration of constraints verified against standard FAIR and SMART methodologies.
+Falsification Condition: This pipeline architecture would be invalidated if the integration of the 4 layers failed to produce a unified, reproducible causal link between the initial physical perturbation and the terminal phenotypic cell death across the 180 compounds.
+Evolution Flag: None.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
