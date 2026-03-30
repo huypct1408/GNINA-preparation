@@ -396,7 +396,7 @@ Successful induced-fit docking (IFD) with GNINA for the bulky *de novo* 1,3-diar
 *   **Evidence Strength:** High (Algorithmic Constraint).
 *   **Why this matters:** This directly falsifies the assumption that all residues within a 4 Å radius should be flexible. If you set all surrounding residues to flexible, GNINA will exhaust its sampling resources generating thermodynamic noise (invalid rotamers). Locking the receptor backbone and non-essential side chains ensures the algorithm isolates its computational power to the 5 residues (Arg513, His90, Val523, Val434, Tyr385) that actually dictate ligand binding.
 
-# 10. PTGES (5TL9, crystal structure of mPGES-1 bound to inhibitor, Discovery and characterization of [(cyclopentyl)ethyl]benzoic acid inhibitors of microsomal prostaglandin E synthase-1) `A:52,A:28,A:32,A:44`
+# 10. PTGES (5TL9, crystal structure of mPGES-1 bound to inhibitor, Discovery and characterization of [(cyclopentyl)ethyl]benzoic acid inhibitors of microsomal prostaglandin E synthase-1) `A:52,A:28,A:32,A:44, B:52, B:28, B:32, B:44` Lấy cả chuỗi A và B làm ỉnterface
 <img width="982" height="918" alt="image" src="https://github.com/user-attachments/assets/c0de0eca-0eda-4f28-9ce9-fad8a00dc395" />
 
 Thesis — ChimeraX verified (within 4Å of 7DN)
