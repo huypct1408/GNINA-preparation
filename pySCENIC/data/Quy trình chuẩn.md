@@ -115,6 +115,37 @@ Bạn không gộp chung 6 dòng này lại với nhau, cũng không chạy riê
 
 Hành động này cung cấp đủ "Năng lượng Thống kê" (Statistical Power) cho máy học, đồng thời đảm bảo mạng lưới được vẽ ra phản ánh chính xác sinh lý bệnh học của từng loại ung thư.
 
+Dựa trên mã nguồn lõi của `grnboost2` và `_prepare_input` mà bạn vừa cung cấp, cùng với yêu cầu khắt khe của Kiến trúc 4 Lớp, đầu vào (inputs) cho **Layer 2 (GRNBoost2)** phải tuân thủ một bộ quy tắc cực kỳ nghiêm ngặt. 
+
+Nếu sai lệch định dạng ở bước này, hệ thống sẽ báo lỗi `ValueError` hoặc chạy ra một ma trận rác tốn hàng chục giờ đồng hồ vô ích.
+
+Dưới đây là **3 Yêu cầu và Ràng buộc (Constraints) tuyệt đối** đối với dữ liệu đầu vào của `grnboost2`:
+
+---
+
+### 1. Ma trận Biểu hiện Gen (The Expression Matrix - `expression_data`)
+Đây là nguyên liệu chính. Nó chứa dữ liệu RNA-seq của nhóm tế bào cùng hệ cơ quan (ví dụ: ~50 dòng tế bào ung thư Vú từ CCLE).
+
+* **Định dạng bắt buộc (Shape):** `ROWS = Mẫu (Cells/Cell lines)`, `COLUMNS = Gen (Genes)`. 
+  * 🚨 *Cạm bẫy cực kỳ phổ biến:* Dữ liệu RNA-seq truyền thống thường xếp Gen ở hàng và Mẫu ở cột. Nếu bạn đưa nhầm ma trận này vào, `grnboost2` sẽ hiểu bạn có 20.000 "mẫu" và 50 "gen". Bạn **bắt buộc phải Transpose (chuyển vị)** nếu file gốc bị ngược, hoặc dùng DataFrame của DepMap (thường đã chuẩn form `n_cells x n_genes`).
+* **Kiểu dữ liệu (Dtype):** Phải là số thực (`float64` hoặc `float32`). Dữ liệu nên là **logTPM** (như file `OmicsExpression...` của DepMap) để giảm độ lệch (skewness).
+* **Tính toàn vẹn (Integrity):** KHÔNG được phép chứa giá trị `NaN`. 
+* **Tên cột (Gene names):** Bắt buộc phải là tên gen theo chuẩn **HGNC symbol** (ví dụ: `EGFR`, `PTGS2`, `MMP9`). Nếu file DepMap của bạn có định dạng `EGFR (1956)`, bạn phải dùng code cắt bỏ phần ID số `(1956)`, chỉ giữ lại chữ `EGFR`.
+
+### 2. Danh sách Yếu tố Phiên mã (The Transcription Factor List - `tf_names`)
+Thuật toán cần biết trong số 20.000 gen, gen nào là "Sếp" (Transcription Factor) có khả năng điều khiển các gen khác.
+
+* **Định dạng:** Một danh sách (List) hoặc mảng 1 chiều chứa chuỗi (strings).
+* **Nguồn dữ liệu:** Tuyệt đối không tự bịa ra. Bạn phải tải file danh sách TF chuẩn của người (Human) do pySCENIC cung cấp (ví dụ: `hs_hgnc_tfs.txt` - chứa khoảng ~1800 TFs).
+* **Ràng buộc Giao thoa (Intersection Constraint):** Như trong mã nguồn có ghi rõ: 
+  `if not set(gene_names).intersection(set(tf_names)): raise ValueError(...)`
+  Danh sách TF của bạn **phải khớp hoàn toàn về mặt chính tả** với tên cột của ma trận RNA-seq (HGNC symbols).
+
+### 3. Ràng buộc Không gian Mẫu (The Sample Size Constraint)
+*Nhắc lại bài học về "Lời nguyền Không gian đa chiều".*
+* **Yêu cầu:** Số lượng hàng (rows) của `expression_data` **tuyệt đối không được là 1 hay 6**. Nó phải là toàn bộ các dòng tế bào thuộc hệ cơ quan bạn đang chạy (Ví dụ: `OncotreeLineage == 'Breast'`, thường là từ 40 đến 100+ dòng tế bào).
+
+
 **Bước 2.2: Lọc Tọa độ Tử huyệt bằng AUCell**
 Sau khi đã có các bộ Master Regulons chuẩn xác, chúng ta chuyển sang Lớp 3 với thuật toán `AUCell`. 
 Sức mạnh tuyệt đối của `AUCell` là nó tính toán **độc lập trên từng mẫu đơn lẻ (Single-sample scoring)**.
