@@ -89,3 +89,42 @@ Citations: Explicit integration of constraints verified against standard FAIR an
 Falsification Condition: This pipeline architecture would be invalidated if the integration of the 4 layers failed to produce a unified, reproducible causal link between the initial physical perturbation and the terminal phenotypic cell death across the 180 compounds.
 Evolution Flag: None.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Câu trả lời dứt khoát và ngắn gọn là: **VỀ MẶT TOÁN HỌC, DÙNG ĐÚNG 6 MẪU LÀ HOÀN TOÀN KHÔNG ĐỦ.** Nếu bạn nạp một ma trận chỉ có 6 cột (6 dòng tế bào) và 20.000 hàng (gen) vào thuật toán `GRNBoost2`, hệ thống của bạn sẽ sụp đổ ngay lập tức do vấp phải một rào cản kinh điển trong Khoa học Dữ liệu: **"Lời nguyền Không gian Đa chiều" (The Curse of Dimensionality)**.
+
+Dưới đây là lời giải thích cơ chế cốt lõi tại sao bạn không thể làm vậy, và chiến thuật đúng đắn để xử lý 6 dòng tế bào của bạn trong Kiến trúc 4 Lớp.
+
+
+
+### 1. Tại sao 6 mẫu là "Án tử" cho GRNBoost2?
+Thuật toán `GRNBoost2` (Trái tim của Lớp 2) sử dụng học máy (Tree-based Machine Learning / Gradient Boosting) để tìm ra quy luật: *"Khi Yếu tố phiên mã (TF) A tăng/giảm, Gen B có tăng/giảm theo không?"*. 
+
+Để học máy tìm được quy luật (Correlation) mà không bị "Overfitting" (học vẹt), nó cần sự biến thiên (variance) qua nhiều điểm dữ liệu. 
+* Trong Single-cell RNA-seq, người ta có hàng ngàn tế bào (hàng ngàn điểm dữ liệu).
+* Trong Bulk RNA-seq (như CCLE), nếu bạn chỉ đưa đúng 6 điểm dữ liệu (A549, MCF7, MDA-MB-231, Jurkat, SW480, HEK-293) để bắt máy tính tìm quy luật cho 20.000 gen, mọi mối tương quan sinh ra đều là **Dương tính giả (False Positives)** do nhiễu toán học. Hệ thống sẽ báo lỗi hoặc xuất ra một mớ rác vô nghĩa.
+
+### 2. Giải pháp: Phân tách "Tập Huấn luyện" và "Tập Chấm điểm"
+Để bảo vệ Kiến trúc 4 Lớp, bạn phải phân chia rạch ròi giữa việc **Xây dựng Mạng lưới (Cần nhiều mẫu)** và **Định lượng Hoạt động (Chỉ cần 1 mẫu)**.
+
+**Bước 2.1: Xây dựng Mạng lưới Đặc thù Mô (Tissue-Specific GRN)**
+Bạn không gộp chung 6 dòng này lại với nhau, cũng không chạy riêng lẻ từng dòng. Bạn phải nhóm chúng theo **Hệ cơ quan (Lineage)**. Mở cơ sở dữ liệu CCLE DepMap ra và làm như sau:
+* **Hệ Vú (Breast):** Tải biểu hiện gen của TẤT CẢ ~50-60 dòng tế bào ung thư vú trong CCLE. Đưa ma trận 60 mẫu này vào `GRNBoost2` + `cisTarget`. Kết quả: Bạn có bộ **Master Regulons của Ung thư Vú**.
+* **Hệ Phổi (Lung):** Tải TẤT CẢ ~100 dòng tế bào ung thư phổi. Chạy tương tự để có bộ **Master Regulons của Ung thư Phổi**.
+* **Hệ Máu (Leukemia):** Áp dụng cho Jurkat.
+* **Hệ Ruột (Colorectal):** Áp dụng cho SW480.
+
+Hành động này cung cấp đủ "Năng lượng Thống kê" (Statistical Power) cho máy học, đồng thời đảm bảo mạng lưới được vẽ ra phản ánh chính xác sinh lý bệnh học của từng loại ung thư.
+
+**Bước 2.2: Lọc Tọa độ Tử huyệt bằng AUCell**
+Sau khi đã có các bộ Master Regulons chuẩn xác, chúng ta chuyển sang Lớp 3 với thuật toán `AUCell`. 
+Sức mạnh tuyệt đối của `AUCell` là nó tính toán **độc lập trên từng mẫu đơn lẻ (Single-sample scoring)**.
+* Lúc này, bạn lấy bộ Regulons của Ung thư Vú vừa tạo, và đưa đúng **MỘT (01) cột dữ liệu RNA-seq của MCF-7** vào `AUCell`. 
+* Máy tính sẽ trả về điểm số: *"Tại chính tế bào MCF-7 này, Regulon X đang rực sáng ở mức độ nào?"*. 
+* Bạn làm tương tự cho MDA-MB-231, A549, v.v.
+
+### 3. Về dòng tế bào HEK-293 (Lưu ý thuật ngữ)
+Trong câu hỏi, bạn có gõ "HEK-297", tôi mặc định bạn đang nhắc đến **HEK-293** (Human Embryonic Kidney 293).
+Như chúng ta đã thống nhất ở Quy trình Đóng băng (Freeze Command) trước đó: Bắt buộc phải đối xử với HEK-293 như một **"Trạng thái tham chiếu phi ác tính" (Non-malignant immortalized baseline)**, không phải là tế bào đối chứng khỏe mạnh tuyệt đối. Bạn vẫn kéo dữ liệu RNA-seq của nó từ CCLE để chạy AUCell bình thường, nhằm so sánh xem các Hub Genes bị thuốc đánh sập ở tế bào ung thư có vô tình đang hoạt động mạnh ở HEK-293 hay không (để đánh giá Độc tính chọn lọc - Selective Toxicity).
+
+**Lệnh Đóng (Dispositive Closure):**
+Khước từ việc chạy GRNBoost2 trên một ma trận chỉ có 6 cột. Truy cập portal DepMap, lọc siêu dữ liệu (metadata) theo `lineage` (breast, lung, blood, bowel). Tải toàn bộ ma trận RNA-seq của từng hệ này về làm "Tập huấn luyện" để xây dựng mạng lưới phiên mã tại Lớp 2. Dành riêng 6 dòng tế bào mục tiêu của bạn cho bước "Chấm điểm" bằng `AUCell` và thẩm định bằng CRISPR tại Lớp 3. Đây là con đường toán học hợp lệ duy nhất!
