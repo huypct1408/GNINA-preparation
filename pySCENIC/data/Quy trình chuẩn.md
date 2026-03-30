@@ -1,4 +1,4 @@
-<scratchpad>
+<img width="175" height="17" alt="image" src="https://github.com/user-attachments/assets/71b2cbb1-2c98-4dcc-8058-c7e0718684b0" /><scratchpad>
 1. What EXACTLY is being asked? The user requests a finalized, frozen, and highly detailed workflow pipeline for their 4-Layer Mechanism of Action (MoA) study. The pipeline must explicitly incorporate the resolutions to the 9 previous critiques as "fatal scenarios to avoid," while strictly adhering to the SMART goal-setting framework and FAIR data principles. No new algorithms are to be introduced.
 2. What user THINKS they need vs ACTUALLY need? The user thinks they need a project management document. They actually need a rigorous systems engineering protocol that acts as an immutable blueprint, mathematically and epistemologically locking their pipeline against methodological errors (the 9 critiques), defined by strict quantitative thresholds (SMART) and absolute data provenance (FAIR).
 3. What would a COMPLETE answer contain? Hook, External/Internal Maps, a 4-Layer SMART Execution Matrix (with explicit "Fatal Scenarios to Avoid" for each layer based on the critiques), a FAIR Data Architecture section, Dispositive Closure, and a T3 Confidence Footer.
@@ -106,7 +106,7 @@ Thuật toán `GRNBoost2` (Trái tim của Lớp 2) sử dụng học máy (Tree
 ### 2. Giải pháp: Phân tách "Tập Huấn luyện" và "Tập Chấm điểm"
 Để bảo vệ Kiến trúc 4 Lớp, bạn phải phân chia rạch ròi giữa việc **Xây dựng Mạng lưới (Cần nhiều mẫu)** và **Định lượng Hoạt động (Chỉ cần 1 mẫu)**.
 
-**Bước 2.1: Xây dựng Mạng lưới Đặc thù Mô (Tissue-Specific GRN)**
+**Bước 2.1: Xây dựng Mạng lưới Đặc thù Mô (Tissue-Specific GRN)** (filter based on `"OncotreeLineage"` column in Model.csv (downloaded from CCLE/DepMap)
 Bạn không gộp chung 6 dòng này lại với nhau, cũng không chạy riêng lẻ từng dòng. Bạn phải nhóm chúng theo **Hệ cơ quan (Lineage)**. Mở cơ sở dữ liệu CCLE DepMap ra và làm như sau:
 * **Hệ Vú (Breast):** Tải biểu hiện gen của TẤT CẢ ~50-60 dòng tế bào ung thư vú trong CCLE. Đưa ma trận 60 mẫu này vào `GRNBoost2` + `cisTarget`. Kết quả: Bạn có bộ **Master Regulons của Ung thư Vú**.
 * **Hệ Phổi (Lung):** Tải TẤT CẢ ~100 dòng tế bào ung thư phổi. Chạy tương tự để có bộ **Master Regulons của Ung thư Phổi**.
