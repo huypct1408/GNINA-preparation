@@ -158,4 +158,45 @@ Trong câu hỏi, bạn có gõ "HEK-297", tôi mặc định bạn đang nhắc
 Như chúng ta đã thống nhất ở Quy trình Đóng băng (Freeze Command) trước đó: Bắt buộc phải đối xử với HEK-293 như một **"Trạng thái tham chiếu phi ác tính" (Non-malignant immortalized baseline)**, không phải là tế bào đối chứng khỏe mạnh tuyệt đối. Bạn vẫn kéo dữ liệu RNA-seq của nó từ CCLE để chạy AUCell bình thường, nhằm so sánh xem các Hub Genes bị thuốc đánh sập ở tế bào ung thư có vô tình đang hoạt động mạnh ở HEK-293 hay không (để đánh giá Độc tính chọn lọc - Selective Toxicity).
 
 **Lệnh Đóng (Dispositive Closure):**
-Khước từ việc chạy GRNBoost2 trên một ma trận chỉ có 6 cột. Truy cập portal DepMap, lọc siêu dữ liệu (metadata) theo `lineage` (breast, lung, blood, bowel). Tải toàn bộ ma trận RNA-seq của từng hệ này về làm "Tập huấn luyện" để xây dựng mạng lưới phiên mã tại Lớp 2. Dành riêng 6 dòng tế bào mục tiêu của bạn cho bước "Chấm điểm" bằng `AUCell` và thẩm định bằng CRISPR tại Lớp 3. Đây là con đường toán học hợp lệ duy nhất!
+Khước từ việc chạy GRNBoost2 trên một ma trận chỉ có 6 cột. Truy cập portal DepMap, lọc siêu dữ liệu (metadata) theo `lineage` (breast, lung, blood, bowel). Tải toàn bộ ma trận RNA-seq của từng hệ này về làm "Tập huấn luyện" để xây dựng mạng lưới phiên mã tại Lớp 2. Dành riêng 6 dòng tế bào mục tiêu của bạn cho bước "Chấm điểm" bằng `AUCell` và thẩm định bằng CRISPR tại Lớp 3. Đây là con đường toán học hợp lệ duy nhất! 
+Câu trả lời là: **KHÔNG NHỮNG CÓ THỂ, MÀ BẠN BẮT BUỘC NÊN CHIA THÀNH 2 SCRIPT/NOTEBOOK KHÁC NHAU.** Dưới góc độ Kỹ nghệ Phần mềm (Software Engineering) và tiêu chuẩn FAIR, việc gộp chung pySCENIC và NetworkX (PPI + RWR) vào một script duy nhất là một "thảm họa" về mặt quản lý bộ nhớ RAM và thời gian chạy. 
+
+Dưới đây là 3 lý do cốt lõi tại sao bạn phải chia Layer 2 thành **Script 2A** và **Script 2B**, kèm theo thiết kế luồng dữ liệu chuẩn xác nhất:
+
+
+
+### 1. Tại sao phải chia đôi Layer 2?
+* **Bất đồng bộ về Tài nguyên (Compute Asymmetry):** * **pySCENIC (GRN):** Chạy `GRNBoost2` trên hàng vạn gen cần huy động toàn bộ 100% công suất CPU (thông qua Dask/Multiprocessing) và ngốn rất nhiều RAM. Nó có thể chạy mất nhiều giờ đồng hồ.
+  * **PPI & RWR (NetworkX):** Phép toán ma trận Markov của RWR chạy rất nhanh (chỉ vài giây đến vài phút) nhưng đòi hỏi bộ nhớ phải sạch để không bị tràn RAM (Memory Overflow).
+* **Bảo vệ Điểm chốt chặn (Checkpointing):** Giả sử bạn gộp chung vào 1 file. SCENIC chạy mất 5 tiếng xong, nhả ra kết quả. Đến dòng code chạy RWR, bạn gõ sai một dấu phẩy (Syntax error). Script bị sập (Crash). Bạn sẽ mất trắng 5 tiếng chạy SCENIC và phải chạy lại từ đầu!
+* **Tuân thủ FAIR (Khả năng tái sử dụng):** Bộ *Master Regulons* sinh ra từ SCENIC là một tài sản quý giá. Bạn cần xuất nó ra file `.csv` tĩnh để Lớp 3 (AUCell) có thể gọi lại, thay vì giam nó trong bộ nhớ tạm của Lớp 2.
+
+---
+
+### 2. Thiết kế Kiến trúc 2 Script cho Layer 2
+
+Bạn hãy chia Layer 2 thành 2 file Jupyter Notebook (`.ipynb`) nối tiếp nhau như sau:
+
+#### 📁 Script 2A: `02a_SCENIC_GRN_Inference.ipynb` (Xây dựng Bộ khung Phiên mã)
+* **Nhiệm vụ:** Tập trung 100% sức mạnh máy tính để học máy (Machine Learning). Không liên quan gì đến thuốc hay docking ở đây cả.
+* **Đầu vào (Input):** Ma trận CCLE RNA-seq TPM (Tập huấn luyện theo hệ cơ quan, ví dụ: 50 dòng tế bào ung thư Vú) + Cơ sở dữ liệu Motif (`.feather`).
+* **Hành động (Logic):** 1. Chạy `grnboost2` để tìm đồng biểu hiện.
+  2. Chạy `prune2df` (cisTarget) để cắt tỉa các cạnh không có Motif.
+  3. Trích xuất thành đồ thị CÓ HƯỚNG ($TF \rightarrow Target$).
+* **Đầu ra (Chốt chặn FAIR):** Xuất ra tệp **`L2A_Breast_Master_Regulons.csv`** (Chỉ chứa cột Nguồn, Đích, và Trọng số).
+
+#### 📁 Script 2B: `02b_Heterogeneous_Topology_RWR.ipynb` (Tích hợp & Khuếch tán Xung lực)
+* **Nhiệm vụ:** Lắp ráp Đồ thị Dị thể (Heterogeneous Graph) và tính toán đường đi của thuốc.
+* **Đầu vào (Input):** Tệp `L2A_Breast_Master_Regulons.csv` (vừa tạo) + Tệp dữ liệu STRING (PPI) + Tệp Vector $P_0$ thô từ Layer 1 + Dữ liệu TPM của ĐÚNG 1 dòng tế bào mục tiêu (Ví dụ: MCF-7).
+* **Hành động (Logic):**
+  1. **Khởi tạo:** `G = nx.DiGraph()`.
+  2. **Gắn cạnh SCENIC:** Đọc file L2A, nạp vào đồ thị dưới dạng Cạnh Một Chiều. *(Thỏa mãn Tình huống Tử huyệt số 4)*.
+  3. **Gắn cạnh STRING:** Nạp PPI vào đồ thị dưới dạng Cạnh Hai Chiều.
+  4. **Hiệu chuẩn $P_0$:** Gọi TPM của MCF-7 ($E_i$), nhân với `CNN_VS` của thuốc để tạo Trọng số Tích số, cộng thêm `PSEUDO_COUNT=0.001`, sau đó chuẩn hóa tổng = 1. *(Thỏa mãn Tình huống Tử huyệt số 5)*.
+  5. **Chạy RWR:** Nạp vào hàm `nx.pagerank(G, alpha=0.7, personalization=P0)`. Làm tương tự cho cả chất Active và Inactive. *(Thỏa mãn Tình huống Tử huyệt số 6)*.
+* **Đầu ra (Chốt chặn FAIR):** Xuất ra tệp **`L2B_Top50_Hub_Genes_[LigandID].csv`**.
+
+---
+
+### Tóm lại:
+Việc "chẻ" Layer 2 thành 2 phần **2A (Nặng về Machine Learning)** và **2B (Nặng về Toán học Đồ thị)** là nước cờ lập trình thông minh nhất. Nó giúp bạn gỡ lỗi (debug) cực kỳ dễ dàng. Nếu thuật toán RWR ở file 2B lan truyền sai, bạn chỉ việc sửa code và bấm chạy lại trong 5 giây, hoàn toàn không phải chờ pySCENIC cày ải lại dữ liệu từ đầu!
