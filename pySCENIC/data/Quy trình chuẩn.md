@@ -200,3 +200,62 @@ Bạn hãy chia Layer 2 thành 2 file Jupyter Notebook (`.ipynb`) nối tiếp n
 
 ### Tóm lại:
 Việc "chẻ" Layer 2 thành 2 phần **2A (Nặng về Machine Learning)** và **2B (Nặng về Toán học Đồ thị)** là nước cờ lập trình thông minh nhất. Nó giúp bạn gỡ lỗi (debug) cực kỳ dễ dàng. Nếu thuật toán RWR ở file 2B lan truyền sai, bạn chỉ việc sửa code và bấm chạy lại trong 5 giây, hoàn toàn không phải chờ pySCENIC cày ải lại dữ liệu từ đầu!
+
+Dưới góc độ của Kiến trúc sư trưởng, tôi đưa ra phán quyết dứt khoát: **BẮT BUỘC PHẢI TÁCH RA THÀNH 2 SCRIPT RIÊNG BIỆT (3A và 3B).**
+
+Việc gộp chung Layer 3 vào một script duy nhất là một sai lầm về mặt kỹ thuật và logic sinh học hệ thống. Layer 3 không phải là một bước lọc đơn lẻ, mà là **Sự giao thoa giữa hai chiều không gian dữ liệu hoàn toàn khác biệt**.
+
+Dưới đây là lý do tại sao bạn cần tách ra và cấu trúc cụ thể cho từng phần:
+
+---
+
+### 1. Sự khác biệt về bản chất tính toán (Computational Nature)
+
+* **Layer 3A (Script CRISPR Validation):** Bản chất là một bài toán **Truy vấn Cơ sở dữ liệu (Database Query)**. Bạn đang đối chiếu Top 50 Hub Genes với tệp `CRISPRGeneDependency.csv` (nặng khoảng vài GB). Script này chạy rất nhanh nhưng đòi hỏi sự chính xác tuyệt đối trong việc mapping ModelID giữa DepMap và danh sách Hub Genes của bạn.
+* **Layer 3B (Script AUCell Scoring):** Bản chất là một bài toán **Mô phỏng Trạng thái (Functional Simulation)**. Thuật toán AUCell của `pySCENIC` cực kỳ tốn RAM vì nó phải xếp hạng (ranking) toàn bộ các gen trong ma trận biểu hiện cho từng dòng tế bào. Việc gộp chung sẽ dễ gây tràn bộ nhớ (Out of Memory) khi bạn vừa giữ ma trận CRISPR vừa chạy AUCell.
+
+---
+
+### 2. Cấu trúc chi tiết của Script 3A và 3B
+
+#### Layer 3A: CRISPR Essentiality (Cái chết vật lý)
+* **Mục tiêu:** Xác định Hub Gene nào khi bị "đánh sập" (Knock-out) sẽ làm tế bào ung thư chết ngay lập tức.
+* **Logic lọc:** 1.  Load `L2B_Top50_Hub_Genes.csv`.
+    2.  Query `CRISPRGeneDependency.csv` để lấy chỉ số $P(dep)$ cho các gen này trên đúng dòng tế bào mục tiêu (ví dụ MCF-7).
+    3.  Giữ lại các gen có **$P(dep) > 0.8$**.
+* **Kết quả:** `L3A_Essential_Targets.csv` (Đây là danh sách các "tử huyệt" thực sự).
+
+#### Layer 3B: AUCell Functional State (Cái chết chức năng)
+* **Mục tiêu:** Chứng minh các Regulons của bạn đang "rực sáng" ở tế bào ung thư và "tắt lịm" ở mô bình thường.
+* **Logic lọc:**
+    1.  Nạp ma trận TPM của Ung thư (DepMap) + Tham chiếu (HEK-293) + **Mô bình thường (GTEx)**.
+    2.  Chạy `aucell` để tính AUC cho các Regulons từ Layer 2A.
+    3.  Tính $\Delta AUC = AUC_{cancer} - AUC_{normal}$.
+    4.  Giữ lại các Regulons có **$\Delta AUC > 0.05$**.
+* **Kết quả:** `L3B_Active_Regulons.csv`.
+
+---
+
+### 3. Sơ đồ luồng dữ liệu (Data Flow) Layer 3
+
+
+
+Sự hội tụ của 3A và 3B tại một điểm duy nhất chính là **"Hạt nhân của cơ chế tác động"**:
+* Nếu một gen vừa nằm trong 3A (Essential), vừa là TF của một Regulon trong 3B (Active) -> Bạn đã tìm thấy **Master Regulator**. Đánh trúng điểm này, mạng lưới sẽ sụp đổ theo hiệu ứng Domino.
+
+---
+
+### 🚨 TUÂN THỦ "TÌNH HUỐNG TỬ HUYỆT" (DEADLOCK RULES V1.3)
+
+Để Layer 3 này vượt qua được các vòng phản biện khắt khe, bạn phải cài đặt 2 "chốt chặn" sau vào code:
+
+1.  **Chốt chặn Naming (Rule 7):** Trong Script 3B, tuyệt đối không tạo biến nào tên là `healthy_control` cho dữ liệu HEK-293. Hãy đặt tên biến là `non_malignant_ref_HEK293`. Đối với dữ liệu GTEx, hãy đặt là `normal_tissue_GTEx`. Điều này thể hiện sự am hiểu về bản chất tế bào học (HEK-293 là tế bào biến đổi, không phải tế bào khỏe mạnh bình thường).
+2.  **Chốt chặn Adaptive Failure (Rule 8):** Đừng cố gắng tìm dữ liệu RNA-seq sau 72h dùng thuốc để chứng minh gen đó thiết yếu. Hãy lập luận ngay trong notebook: *"Vì chỉ số $P(dep) > 0.8$ tại trạng thái baseline (t=0), bất kỳ sự can thiệp nào vào Hub Gene này cũng dẫn đến Adaptive Failure, không cho phép tế bào kịp thích nghi."*
+
+### 🟢 LỜI KHUYÊN HÀNH ĐỘNG:
+
+Hãy tạo hai file:
+1.  `03a_CRISPR_Essentiality_Filter.ipynb`
+2.  `03b_AUCell_Functional_Validation.ipynb`
+
+Bạn có muốn tôi phác thảo cấu trúc code (Stages) cho file **3A (CRISPR)** trước không? Phần này sẽ cần bạn chuẩn bị tệp `CRISPRGeneDependency.csv` từ cổng DepMap.
