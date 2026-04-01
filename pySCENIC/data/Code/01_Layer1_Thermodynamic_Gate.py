@@ -1,41 +1,5 @@
-# Layer 1: Thermodynamic Gate Pipeline v1.3\n
-\n
-**Purpose**: Filter GNINA docking results by thermodynamic feasibility (dG <= -6.5 kcal/mol) using **Two-Track Architecture** with Intra-Ligand PoseBusters Rescue Logic, and calculate P0 raw weight vector for downstream analysis.\n
-\n
----\n
-\n
-## SMART Matrix\n
-| Criterion | Specification |\n
-|-----------|---------------|\n
-| **Specific** | Process 179 ligands x 9 targets via Two-Track system, apply Gate 1 filter, output P0 vector |\n
-| **Measurable** | dG <= -6.5 kcal/mol threshold, CNNscore >= 0.5 fallback, rescue statistics |\n
-| **Achievable** | Uses existing GNINA docking results + PoseBusters validation (3 targets) |\n
-| **Relevant** | Foundation for Layer 2+ kinetic analysis |\n
-| **Time-bound** | Single notebook execution (~2-5 min) |\n
-\n
-## Three Deadlock Rules (CRITICAL)\n
-- **DL1**: NEVER normalize P0 before filtering dG > -6.5\n
-- **DL2**: NEVER interpret agonist/antagonist at Layer 1\n
-- **DL3**: NEVER use mutant proteins - only WT crystal structures\n
-\n
-## Two-Track Architecture (v1.3)\n
-- **Track 1** (PPARA, PPARD, ALOX-5): Load from posebusters_master_results.csv (1790 poses per target), filter PoseBuster_Valid == True, sort by CNN_VS, select best valid pose per ligand (RESCUE LOGIC)\n
-- **Track 2** (PPARG, EGFR, ERBB2, KDR, PTGS2, PTGES): Load from Excel Sheet 1 (Inter-Ligand_Ranking), apply CNNscore >= 0.5 fallback filter\n
-\n
-## HOTFIX Log\n
-- **HOTFIX #1**: Inverted Affinity Normalization (more negative dG = higher score)\n
-- **HOTFIX #2**: Per-Target Normalization (avoid binding pocket size bias for fair RWR)\n
-\n
-## Stages\n
-1. Imports & Config\n
-2. Data Loading Functions\n
-3. Track 1 - PoseBusters Targets with Rescue Logic\n
-4. Track 2 - Non-PoseBusters Targets with CNNscore Fallback\n
-5. Combine Tracks & Gate 1 Filter\n
-6. P0 Assembly (HOTFIX #1 + HOTFIX #2 + Pivot Matrix)\n
-7. Deadlock Validation\n
-8. QC Visualizations (including QC5: Rescue Statistics)\n
-9. Export & Summary
+# Layer 1: Thermodynamic Gate Pipeline v1.3
+# **Purpose**: Filter GNINA docking results by thermodynamic feasibility (dG <= -6.5 kcal/mol) using **Two-Track Architecture** with Intra-Ligand PoseBusters Rescue Logic, and calculate P0 raw weight vector for downstream analysis.\n
 # =============================================================================
 # STAGE 1: IMPORTS & CONFIG
 # =============================================================================
