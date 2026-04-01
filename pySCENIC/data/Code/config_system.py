@@ -1,5 +1,5 @@
 # ============================================================
-# config_system.py - Central Configuration Hub v1.2
+# config_system.py - Central Configuration Hub v1.3
 # ============================================================
 # Purpose: Single source of truth for multi-layer analysis pipeline
 #          (Layer 1 -> Layer N). All notebooks import from here
@@ -17,6 +17,11 @@
 #   v1.2 - Two-Track Architecture: Added pose-level columns, sheet indices,
 #          track definitions (TARGETS_WITH_PB, TARGETS_WITHOUT_PB),
 #          rescue report path, fixed COL_PB_VALID column name
+#   v1.3 - Layer 2A: SCENIC GRN Inference configuration
+#          - CCLE/DepMap data paths
+#          - pySCENIC resource paths (TF list, motif DBs)
+#          - Lineage definitions (OncotreeLineage level)
+#          - GRNBoost2 parameters
 # ============================================================
 
 from pathlib import Path
@@ -33,6 +38,11 @@ DOCKING_PARENT_DIR = Path(r"D:\khoa_luan\(gnina) docking results")
 # LAYER 1 OUTPUT DIRECTORIES (NEW v1.1)
 # ============================================================
 LAYER1_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer1_Thermodynamic_Gate"
+
+# ============================================================
+# LAYER 2A OUTPUT DIRECTORIES (NEW v1.3)
+# ============================================================
+LAYER2A_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer2A_SCENIC_GRN"
 
 # ============================================================
 # POSEBUSTERS VALIDATION PATHS (NEW v1.1)
@@ -63,6 +73,134 @@ TARGETS_WITHOUT_PB = ["PPARG", "EGFR", "ERBB2", "KDR", "PTGS2", "PTGES"]
 # Excel sheet indices
 SHEET_INTRA_LIGAND = 0  # Intra-Ligand_Poses (wide format, P1_*, P2_*, P3_*)
 SHEET_INTER_LIGAND = 1  # Inter-Ligand_Ranking (179 rows, best pose per ligand)
+
+# ============================================================
+# CCLE / DEPMAP DATA PATHS (NEW v1.3)
+# ============================================================
+# CCLE (Cancer Cell Line Encyclopedia) from DepMap portal
+# https://depmap.org/portal/data_page/?tab=allData&releasename=DepMap%20Public%2025Q3
+#
+# Scientific basis:
+#   - TPM log2(x+1) is GOLD STANDARD for GRNBoost2 input
+#   - NO additional transformation needed (already normalized)
+#   - Matrix orientation: Rows=Samples, Cols=Genes (GRNBoost2 compatible)
+# ============================================================
+CCLE_DATA_DIR = Path(r"D:\khoa_luan\protein\SCENIC")
+
+# Model metadata with OncotreeLineage column for filtering
+CCLE_MODEL_CSV = CCLE_DATA_DIR / "Model.csv"
+
+# Expression data - USER MUST DOWNLOAD from DepMap 25Q3
+# File: OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv
+CCLE_TPM_EXPRESSION_CSV = CCLE_DATA_DIR / "OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv"
+
+# ============================================================
+# PYSCENIC RESOURCE PATHS (NEW v1.3)
+# ============================================================
+# pySCENIC requires:
+#   1. TF list (transcription factors)
+#   2. Motif databases (.feather) - for cisTarget pruning
+#   3. Motif annotations (.tbl) - TF-motif mappings
+#
+# Download from Aerts Lab:
+#   https://resources.aertslab.org/cistarget/databases/
+#   https://resources.aertslab.org/cistarget/motif2tf/
+# ============================================================
+SCENIC_RESOURCE_DIR = CCLE_DATA_DIR
+
+# Human TF list - EXISTS (1839 TFs)
+SCENIC_TF_LIST = SCENIC_RESOURCE_DIR / "hs_hgnc_tfs.txt"
+
+# Motif databases directory - USER MUST DOWNLOAD
+# Expected files: hg38_*.feather (e.g., hg38_10kbp_up_10kbp_down_full_tx_v10.feather)
+SCENIC_MOTIF_DB_DIR = Path(r"<USER_FILL_IN_PATH>")
+
+# Motif annotations - USER MUST DOWNLOAD
+# Expected file: motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl
+SCENIC_MOTIF_ANNOTATIONS = Path(r"<USER_FILL_IN_PATH>")
+
+# ============================================================
+# LINEAGE DEFINITIONS (NEW v1.3)
+# ============================================================
+# OncotreeLineage level filtering for GRNBoost2 statistical power
+# Minimum 40-50+ samples per lineage required for robust inference
+#
+# Architecture Decision: Use OncotreeLineage (NOT OncotreePrimaryDisease)
+#   - OncotreePrimaryDisease too granular (often <20 samples)
+#   - OncotreeLineage provides biological coherence + sample size
+#
+# Cell line mappings:
+#   MCF-7, MDA-MB-231 -> Breast
+#   A549             -> Lung
+#   Jurkat           -> Lymphoid (T-cell Leukemia)
+#   SW480            -> Bowel (Colorectal)
+#   HEK-293          -> Kidney (reference, non-malignant)
+# ============================================================
+LINEAGES_OF_INTEREST = [
+    "Breast",
+    "Lung",
+    "Lymphoid",
+    "Bowel",
+    "Kidney",
+]
+
+# Column name in Model.csv for lineage filtering
+COL_ONCOTREE_LINEAGE = "OncotreeLineage"
+COL_MODEL_ID = "ModelID"  # Sample identifier column
+
+# Minimum samples per lineage for GRNBoost2
+MIN_SAMPLES_PER_LINEAGE = 40
+
+# ============================================================
+# GRNBOOST2 PARAMETERS (NEW v1.3)
+# ============================================================
+# GRNBoost2 is the gradient boosting implementation of GENIE3
+# Optimized for single-cell / bulk RNA-seq GRN inference
+#
+# Scientific basis:
+#   - Uses Dask for distributed computing
+#   - client_or_address='custom_multiprocessing' for local execution
+#   - n_workers=4 recommended for RAM safety (16GB+ system)
+#   - seed=42 for reproducibility
+# ============================================================
+GRNBOOST2_N_WORKERS = 4          # Number of parallel workers
+GRNBOOST2_SEED = 42              # Random seed for reproducibility
+GRNBOOST2_VERBOSE = True         # Print progress
+
+# Output column names (after renaming)
+COL_GRN_SOURCE = "Source"        # TF (transcription factor)
+COL_GRN_TARGET = "Target"        # Target gene
+COL_GRN_WEIGHT = "Weight"        # Importance score
+
+# Raw GRNBoost2 output columns (before renaming)
+COL_GRNBOOST2_TF = "TF"
+COL_GRNBOOST2_TARGET = "target"
+COL_GRNBOOST2_IMPORTANCE = "importance"
+
+# ============================================================
+# CISTARGET PARAMETERS (NEW v1.3)
+# ============================================================
+# cisTarget prunes GRNBoost2 adjacencies using motif enrichment
+# Requires motif databases and annotations from Aerts Lab
+#
+# Graceful skip: If motif DB not available, skip cisTarget step
+#   - Output raw GRNBoost2 adjacencies as preliminary GRN
+#   - User can run cisTarget later when resources available
+# ============================================================
+CISTARGET_NES_THRESHOLD = 3.0    # Normalized Enrichment Score threshold
+CISTARGET_RANK_THRESHOLD = 0.05  # Top 5% of ranked genes
+CISTARGET_AUC_THRESHOLD = 0.05   # AUC threshold for motif recovery
+CISTARGET_MOTIF_SIMILARITY_FDR = 0.001  # FDR for motif similarity
+
+# ============================================================
+# LAYER 2A OUTPUT FILENAMES (NEW v1.3)
+# ============================================================
+L2A_ADJACENCIES_CSV = "L2A_GRNBoost2_Adjacencies_{lineage}.csv"
+L2A_REGULONS_CSV = "L2A_Regulons_{lineage}.csv"
+L2A_MASTER_ADJACENCIES_CSV = "L2A_Master_Adjacencies_AllLineages.csv"  # Raw GRNBoost2
+L2A_MASTER_REGULONS_CSV = "L2A_Master_Regulons_AllLineages.csv"        # cisTarget pruned
+L2A_AUC_MATRIX_CSV = "L2A_AUC_Matrix_{lineage}.csv"
+L2A_QC_PLOTS_DIR = "L2A_QC_Plots"
 
 # ============================================================
 # 9 TARGET PROTEINS
@@ -323,12 +461,13 @@ CNN_VS_NOTE = (
 # ============================================================
 PROJECT_METADATA = {
     "project_name": "Benzyl Ether Multi-Target Docking Campaign",
-    "version": "1.2.0",
-    "pipeline_version": "GNINA_v2.6.2",
+    "version": "1.3.0",
+    "pipeline_version": "GNINA_v2.6.2 + pySCENIC",
     "n_ligands": N_LIGANDS_EXPECTED,
     "n_targets": N_TARGETS,
     "targets": TARGET_NAMES,
     "docking_engine": "GNINA (CNN-based scoring)",
+    "grn_engine": "pySCENIC (GRNBoost2 + cisTarget)",
     "scoring_functions": [
         "minimizedAffinity (Vina forcefield)",
         "CNNscore (pose probability)",
@@ -369,6 +508,14 @@ DEADLOCK_RULES = {
         "ABSOLUTELY DO NOT simulate mutant proteins at Layer 1. "
         "Only use wild-type (WT) crystal structures."
     ),
+    "DL4_GRNBOOST2_ORIENTATION": (
+        "DO NOT transpose expression matrix for GRNBoost2. "
+        "CCLE TPM format (Rows=Samples, Cols=Genes) is already correct."
+    ),
+    "DL5_GENE_NAME_FORMAT": (
+        "MUST strip Entrez IDs from gene names before GRNBoost2. "
+        "Use: df.columns = [c.split(' (')[0] for c in df.columns]"
+    ),
 }
 
 # ============================================================
@@ -377,11 +524,12 @@ DEADLOCK_RULES = {
 def print_config_summary():
     """Print current configuration summary - call at start of each notebook."""
     print("=" * 64)
-    print("CONFIG SYSTEM - Central Configuration Hub v1.2")
+    print("CONFIG SYSTEM - Central Configuration Hub v1.3")
     print("=" * 64)
     print(f"Project root:       {PROJECT_ROOT}")
     print(f"Docking data:       {DOCKING_PARENT_DIR}")
     print(f"Layer 1 output:     {LAYER1_OUTPUT_DIR}")
+    print(f"Layer 2A output:    {LAYER2A_OUTPUT_DIR}")
     print(f"Targets:            {N_TARGETS} ({', '.join(TARGET_NAMES)})")
     print(f"  Track 1 (PB):     {', '.join(TARGETS_WITH_PB)}")
     print(f"  Track 2 (no PB):  {', '.join(TARGETS_WITHOUT_PB)}")
@@ -391,6 +539,12 @@ def print_config_summary():
     print(f"alpha (CNN_VS):     {ALPHA_CNN_VS_WEIGHT}")
     print(f"Normalization:      {NORMALIZATION_METHOD}")
     print(f"Deadlock rules:     {len(DEADLOCK_RULES)} active")
+    print("-" * 64)
+    print("Layer 2A (SCENIC GRN):")
+    print(f"  CCLE data dir:    {CCLE_DATA_DIR}")
+    print(f"  Lineages:         {', '.join(LINEAGES_OF_INTEREST)}")
+    print(f"  GRNBoost2 workers:{GRNBOOST2_N_WORKERS}")
+    print(f"  Min samples:      {MIN_SAMPLES_PER_LINEAGE}")
     print("=" * 64)
 
 
@@ -420,6 +574,33 @@ def validate_deadlock_rules(step: str, **context):
             f"DEADLOCK VIOLATION - DL3:\n"
             f"{DEADLOCK_RULES['DL3_MUTANT_SIMULATION']}"
         )
+    elif step == "grnboost2_orientation":
+        assert not context.get("transposed", False), (
+            f"DEADLOCK VIOLATION - DL4:\n"
+            f"{DEADLOCK_RULES['DL4_GRNBOOST2_ORIENTATION']}"
+        )
+    elif step == "gene_name_format":
+        assert context.get("stripped_entrez", False), (
+            f"DEADLOCK VIOLATION - DL5:\n"
+            f"{DEADLOCK_RULES['DL5_GENE_NAME_FORMAT']}"
+        )
+
+
+def check_scenic_resources() -> dict:
+    """
+    Check availability of pySCENIC resources.
+    
+    Returns:
+        dict with keys: tf_list, motif_db, motif_annotations
+        Values: True if available, False otherwise
+    """
+    return {
+        "tf_list": SCENIC_TF_LIST.exists(),
+        "motif_db": SCENIC_MOTIF_DB_DIR.exists() and str(SCENIC_MOTIF_DB_DIR) != "<USER_FILL_IN_PATH>",
+        "motif_annotations": SCENIC_MOTIF_ANNOTATIONS.exists() and str(SCENIC_MOTIF_ANNOTATIONS) != "<USER_FILL_IN_PATH>",
+        "ccle_model": CCLE_MODEL_CSV.exists(),
+        "ccle_tpm": CCLE_TPM_EXPRESSION_CSV.exists(),
+    }
 
 
 # ============================================================
@@ -427,9 +608,14 @@ def validate_deadlock_rules(step: str, **context):
 # ============================================================
 if __name__ == "__main__":
     print_config_summary()
-    print("\nconfig_system.py v1.2 loaded successfully.")
+    print("\nconfig_system.py v1.3 loaded successfully.")
     print(f"   Deadlock rules: {list(DEADLOCK_RULES.keys())}")
     pb_configured = sum(1 for v in POSEBUSTERS_PATHS.values() if v is not None)
     print(f"   PoseBusters paths configured: {pb_configured}/{len(POSEBUSTERS_PATHS)}")
     print(f"   Track 1 targets: {TARGETS_WITH_PB}")
     print(f"   Track 2 targets: {TARGETS_WITHOUT_PB}")
+    print("\n   SCENIC Resources:")
+    resources = check_scenic_resources()
+    for key, available in resources.items():
+        status = "OK" if available else "MISSING"
+        print(f"      {key}: {status}")
