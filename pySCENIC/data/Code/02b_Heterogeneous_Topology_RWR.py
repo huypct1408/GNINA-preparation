@@ -4,7 +4,6 @@
 # Integrate heterogeneous biological networks (SCENIC GRN + STRING PPI) and apply Random Walk with Restart (RWR) to identify drug-responsive hub genes.
 ## Stage 1: Imports & Configuration
 
-Load all required libraries and verify config_system.py v1.4 settings.
 # ============================================================
 # Stage 1: Imports & Configuration
 # ============================================================
@@ -80,11 +79,11 @@ print(f"Output directory: {cfg.LAYER2B_OUTPUT_DIR}")
 # Record pipeline start
 PIPELINE_START = datetime.now()
 print(f"Pipeline started at: {PIPELINE_START.strftime('%Y-%m-%d %H:%M:%S')}")
----
+
 ## Stage 2: Load SCENIC GRN (Graceful Degradation)
 
-Load transcriptional regulatory edges from Layer 2A (if available).  
-**Graceful Degradation**: If L2A output missing, proceed with STRING-only graph.
+#Load transcriptional regulatory edges from Layer 2A (if available).  
+#**Graceful Degradation**: If L2A output missing, proceed with STRING-only graph.
 # ============================================================
 # Stage 2: Load SCENIC GRN (Graceful Degradation)
 # ============================================================
@@ -133,11 +132,10 @@ if SCENIC_AVAILABLE:
     print(f"  Unique TFs: {n_tfs:,}")
     print(f"  Unique targets: {n_targets:,}")
     print(f"  Total edges: {len(scenic_edges_df):,}")
----
 ## Stage 3: Load STRING PPI (Physical Links, Score >= 700)
 
-Load high-confidence physical protein-protein interactions from STRING v12.0.  
-Only use `physical.links` (direct binding) to avoid hairball effect from co-expression noise.
+#Load high-confidence physical protein-protein interactions from STRING v12.0.  
+#Only use `physical.links` (direct binding) to avoid hairball effect from co-expression noise.
 # ============================================================
 # Stage 3: Load STRING PPI (Physical Links)
 # ============================================================
@@ -238,11 +236,11 @@ print("\nSTRING PPI Summary:")
 print(f"  Total high-confidence edges: {len(string_ppi_mapped):,}")
 print(f"  Unique genes: {pd.concat([string_ppi_mapped['Gene1_Normalized'], string_ppi_mapped['Gene2_Normalized']]).nunique():,}")
 print(f"  Score range: {string_ppi_mapped['combined_score'].min()} - {string_ppi_mapped['combined_score'].max()}")
----
+
 ## Stage 4: Load Cell Line TPM Expression
 
-Load cell line-specific expression data for P0 calibration.  
-Expression level determines tissue relevance of drug target signal.
+#Load cell line-specific expression data for P0 calibration.  
+#Expression level determines tissue relevance of drug target signal.
 # ============================================================
 # Stage 4: Load Cell Line TPM Expression
 # ============================================================
@@ -344,14 +342,13 @@ plt.savefig(cfg.LAYER2B_OUTPUT_DIR / f"L2B_{cfg.TARGET_CELL_LINE}_Expression_Dis
 plt.show()
 
 print(f"\nSaved: L2B_{cfg.TARGET_CELL_LINE}_Expression_Distribution.png")
----
+
 ## Stage 5: Assemble Heterogeneous Graph & P0 Calibration
+# Build the combined graph with:
+#- SCENIC edges: **Directed** (TF → Target) - respects DL6
+#- STRING edges: **Undirected** (protein <-> protein)
+# Then calibrate P0 vector using: $P_{0,i} = (CNN\_VS_i \times E_i) + \epsilon$
 
-Build the combined graph with:
-- SCENIC edges: **Directed** (TF → Target) - respects DL6
-- STRING edges: **Undirected** (protein <-> protein)
-
-Then calibrate P0 vector using: $P_{0,i} = (CNN\_VS_i \times E_i) + \epsilon$
 # ============================================================
 # Stage 5: Assemble Heterogeneous Graph & P0 Calibration
 # ============================================================
@@ -516,10 +513,10 @@ print(f"  Sum: {sum(test_p0.values()):.6f} (should be ~1.0)")
 # Validate DL7 compliance
 cfg.validate_deadlock_rules("p0_calibration", multiplied_by_expression=True)
 print("\nDL7 Compliance: PASSED (P0 = CNN_VS * Expression)")
----
+
 ## Stage 6: RWR Execution with NetworkX PageRank
 
-Run Random Walk with Restart using `nx.pagerank()` with alpha=0.7 (restart probability).
+#Run Random Walk with Restart using `nx.pagerank()` with alpha=0.7 (restart probability).
 # ============================================================
 # Stage 6: RWR Execution
 # ============================================================
@@ -630,13 +627,13 @@ print(f"\nTop 10 genes for {test_ligand}:")
 for gene, score in top_10:
     is_seed = "(SEED)" if gene in rwr_results[test_ligand]['p0'] else ""
     print(f"  {gene}: {score:.6f} {is_seed}")
----
+
 ## Stage 7: Delta-Network Analysis
 
-Compare Active vs Inactive compounds to identify drug-specific hubs.  
-**DL8 Compliance**: Must compare Active vs Inactive (cannot conclude MoA from single compound).
+#Compare Active vs Inactive compounds to identify drug-specific hubs.  
+#**DL8 Compliance**: Must compare Active vs Inactive (cannot conclude MoA from single compound).
 
-$$Delta\_Score_i = \bar{RWR}_{Active,i} - \bar{RWR}_{Inactive,i}$$
+# $$Delta\_Score_i = \bar{RWR}_{Active,i} - \bar{RWR}_{Inactive,i}$$
 # ============================================================
 # Stage 7: Delta-Network Analysis
 # ============================================================
@@ -759,10 +756,10 @@ print(f"\nSaved: L2B_Delta_Network_Analysis.png")
 delta_output_path = cfg.LAYER2B_OUTPUT_DIR / cfg.L2B_DELTA_NETWORK_CSV
 delta_df.to_csv(delta_output_path, index=False)
 print(f"Saved: {delta_output_path}")
----
+
 ## Stage 8: Export Top 50 Hub Genes per Ligand
 
-Extract and save top hub genes for each ligand, plus master summary file.
+#Extract and save top hub genes for each ligand, plus master summary file.
 # ============================================================
 # Stage 8: Export Top 50 Hub Genes per Ligand
 # ============================================================
@@ -866,10 +863,10 @@ if SAVE_GRAPHML:
 else:
     print("\nGraphML export skipped (SAVE_GRAPHML=False)")
     print("  Set SAVE_GRAPHML=True to export full graph (may be large)")
----
+
 ## Pipeline Complete
 
-Summary of outputs and next steps.
+# Summary of outputs and next steps.
 # ============================================================
 # Pipeline Complete
 # ============================================================
