@@ -244,66 +244,54 @@ print(f"  Score range: {string_ppi_mapped['combined_score'].min()} - {string_ppi
 # ============================================================
 # Stage 4: Load Cell Line TPM Expression
 # ============================================================
+
 print("="*64)
 print(f"STAGE 4: LOAD {cfg.TARGET_CELL_LINE} EXPRESSION")
 print("="*64)
 
-# Load expression data
-# Priority: Use TPM log2(x+1) for P0 calibration (consistent with Layer 2A, scale 0-15)
-# This balances well with CNN_VS (scale 0-1)
-# Fallback to thesis-specific expression file if TPM not available
 if cfg.CCLE_TPM_EXPRESSION_CSV.exists():
     EXPRESSION_FILE = cfg.CCLE_TPM_EXPRESSION_CSV
     EXPRESSION_TYPE = "TPM_log2(x+1)"
     print(f"Using TPM expression (recommended for P0 calibration)")
 else:
-    # Fallback to thesis-specific file
     EXPRESSION_FILE = cfg.CCLE_DATA_DIR / "OmicsExpressionRawReadCountH_thesis_cell_lines_only.csv"
     EXPRESSION_TYPE = "RawReadCount"
-    print(f"WARNING: TPM file not found, using Raw Read Count (may have scale issues)")
-    print(f"  Consider downloading TPM data from DepMap for better P0 calibration")
+    print(f"WARNING: TPM file not found, using Raw Read Count")
 
 print(f"Loading expression data from: {EXPRESSION_FILE}")
-print(f"  Expression type: {EXPRESSION_TYPE}")
 
-expression_df = pd.read_csv(EXPRESSION_FILE, index_col=0)
+# HOTFIX 25Q3: Không dùng index_col=0
+expression_df = pd.read_csv(EXPRESSION_FILE)
+
+# Lọc bản ghi mặc định và set ModelID làm Index
+if 'IsDefaultEntryForModel' in expression_df.columns:
+    expression_df = expression_df[expression_df['IsDefaultEntryForModel'] == 'Yes']
+if 'ModelID' in expression_df.columns:
+    expression_df = expression_df.set_index('ModelID')
+
+# Dọn dẹp metadata rác
+meta_cols = ['SequencingID', 'IsDefaultEntryForModel', 'ModelConditionID', 'IsDefaultEntryForMC']
+cols_to_drop = [c for c in meta_cols if c in expression_df.columns]
+if cols_to_drop:
+    expression_df = expression_df.drop(columns=cols_to_drop)
+
 print(f"  Shape: {expression_df.shape} (samples x genes)")
-print(f"  Samples: {list(expression_df.index)}")
+
 # Find target cell line sample
 print(f"\nSearching for target cell line: {cfg.TARGET_CELL_LINE} ({cfg.TARGET_CELL_LINE_MODEL_ID})")
 
-# Check if ModelID is in index
 if cfg.TARGET_CELL_LINE_MODEL_ID in expression_df.index:
     cell_line_expression = expression_df.loc[cfg.TARGET_CELL_LINE_MODEL_ID]
     print(f"  Found {cfg.TARGET_CELL_LINE} by ModelID: {cfg.TARGET_CELL_LINE_MODEL_ID}")
 else:
-    # Try to find by cell line name (dynamic matching)
-    # Normalize target name: remove hyphens, underscores, convert to uppercase
-    target_normalized = cfg.TARGET_CELL_LINE.upper().replace('-', '').replace('_', '')
-    matching_samples = [
-        idx for idx in expression_df.index 
-        if target_normalized in idx.upper().replace('-', '').replace('_', '')
-    ]
-    if matching_samples:
-        cell_line_expression = expression_df.loc[matching_samples[0]]
-        print(f"  Found {cfg.TARGET_CELL_LINE} by name matching: {matching_samples[0]}")
-    else:
-        raise ValueError(f"{cfg.TARGET_CELL_LINE} sample not found in expression data!")
+    raise ValueError(f"{cfg.TARGET_CELL_LINE} sample ({cfg.TARGET_CELL_LINE_MODEL_ID}) not found in expression data!")
 
-print(f"  Genes with expression data: {len(cell_line_expression):,}")
-print(f"  Expression range: {cell_line_expression.min():.2f} - {cell_line_expression.max():.2f}")
 # Clean gene names (strip Entrez IDs if present)
 print("\nNormalizing gene names in expression data...")
-
-# Check if gene names have Entrez ID suffix like "GENE (12345)"
-sample_genes = list(cell_line_expression.index[:5])
-print(f"  Sample gene names: {sample_genes}")
-
-# Strip Entrez IDs if present (DL5 compliance)
 clean_gene_names = [g.split(' (')[0] for g in cell_line_expression.index]
 cell_line_expression.index = clean_gene_names
 
-# Normalize gene names
+# Normalize gene names (remove hyphens, uppercase)
 normalized_gene_names = [cfg.normalize_gene_name(g) for g in cell_line_expression.index]
 cell_line_expression.index = normalized_gene_names
 
@@ -311,26 +299,20 @@ cell_line_expression.index = normalized_gene_names
 cell_line_expression = cell_line_expression.groupby(cell_line_expression.index).max()
 
 print(f"  Unique normalized genes: {len(cell_line_expression):,}")
-print(f"  Sample normalized names: {list(cell_line_expression.index[:5])}")
-
-# Create expression dictionary for fast lookup
 expression_dict = cell_line_expression.to_dict()
-# Expression distribution
+
+# Expression distribution & Plotting
 print(f"\n{cfg.TARGET_CELL_LINE} Expression Distribution:")
 print(cell_line_expression.describe())
 
-# Visualize
 fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-
-# Histogram
 axes[0].hist(cell_line_expression.values, bins=50, color='steelblue', edgecolor='white', alpha=0.7)
-axes[0].set_xlabel('Expression Level (TPM or Read Count)')
+axes[0].set_xlabel('Expression Level')
 axes[0].set_ylabel('Frequency')
 axes[0].set_title(f'{cfg.TARGET_CELL_LINE} Gene Expression Distribution')
 axes[0].axvline(cell_line_expression.median(), color='red', linestyle='--', label=f'Median: {cell_line_expression.median():.2f}')
 axes[0].legend()
 
-# Log-transformed
 log_expr = np.log10(cell_line_expression.values + 1)
 axes[1].hist(log_expr, bins=50, color='darkgreen', edgecolor='white', alpha=0.7)
 axes[1].set_xlabel('log10(Expression + 1)')
