@@ -570,7 +570,7 @@ print(f"  Estimated total time: ~{est_total_minutes:.1f} minutes")
 print(f"************************\n")
 
 rwr_results = {}
-
+from tqdm.auto import tqdm # Thêm dòng này ở đầu cell nếu chưa có
 for ligand_id in tqdm(unique_ligands, desc="RWR per ligand"):
     # Get ligand-specific targets
     ligand_df = l1_p0_df[l1_p0_df[cfg.COL_LIGAND_ID] == ligand_id]
