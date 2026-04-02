@@ -40,7 +40,7 @@ import logging
 # SYSTEM PATHS
 # ============================================================
 PROJECT_ROOT = Path(__file__).resolve().parent
-DOCKING_PARENT_DIR = Path(r"D:\khoa_luan\(gnina) docking results")
+DOCKING_PARENT_DIR = Path(r"/home/labhhc5/Documents/workspace/D21/Duong Huy/gnina_project")
 
 # ============================================================
 # LAYER 1 OUTPUT DIRECTORIES (NEW v1.1)
@@ -55,19 +55,19 @@ LAYER2A_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer2A_SCENIC_GRN"
 # ============================================================
 # POSEBUSTERS VALIDATION PATHS (NEW v1.1)
 # ============================================================
-POSEBUSTERS_PARENT_DIR = DOCKING_PARENT_DIR / "PoseBuster_results"
+POSEBUSTERS_PARENT_DIR = Path(r'/home/labhhc5/Documents/workspace/D21/Duong Huy/posebusters')
 
 # Mapping: target_name -> path to posebusters CSV (None if not available)
 POSEBUSTERS_PATHS = {
     "PPARA": POSEBUSTERS_PARENT_DIR / "ppara_7bq2" / "summary" / "posebusters_master_results.csv",
     "PPARD": POSEBUSTERS_PARENT_DIR / "ppard_7wgn" / "summary" / "posebusters_master_results.csv",
-    "PPARG": None,  # PB_NOT_AVAILABLE
-    "EGFR": None,   # PB_NOT_AVAILABLE
-    "ERBB2": None,  # PB_NOT_AVAILABLE
-    "KDR": None,    # PB_NOT_AVAILABLE
-    "PTGS2": None,  # PB_NOT_AVAILABLE
+    "PPARG": POSEBUSTERS_PARENT_DIR / "pparg_9f7w" / "summary" / "posebusters_master_results.csv",  # PB_NOT_AVAILABLE -> None
+    "EGFR": POSEBUSTERS_PARENT_DIR / "egfr_1xkk" / "summary" / "posebusters_master_results.csv",   # PB_NOT_AVAILABLE
+    "ERBB2": POSEBUSTERS_PARENT_DIR / "erbb2_7pcd" / "summary" / "posebusters_master_results.csv",  # PB_NOT_AVAILABLE
+    "KDR": POSEBUSTERS_PARENT_DIR / "kdr_5ew3" / "summary" / "posebusters_master_results.csv",   # PB_NOT_AVAILABLE
+    "PTGS2": POSEBUSTERS_PARENT_DIR / "ptgs2_5kir" / "summary" / "posebusters_master_results.csv",  # PB_NOT_AVAILABLE
     "ALOX-5": POSEBUSTERS_PARENT_DIR / "alox5_6n2w" / "summary" / "posebusters_master_results.csv",
-    "PTGES": None,  # PB_NOT_AVAILABLE
+    "PTGES": POSEBUSTERS_PARENT_DIR / "ptges_5tl9" / "summary" / "posebusters_master_results.csv",  # PB_NOT_AVAILABLE
 }
 
 # ============================================================
@@ -75,8 +75,8 @@ POSEBUSTERS_PATHS = {
 # ============================================================
 # Track 1: Targets with PoseBusters validation (pose-level rescue logic)
 # Track 2: Targets without PoseBusters (CNNscore fallback at ligand level)
-TARGETS_WITH_PB = ["PPARA", "PPARD", "ALOX-5"]
-TARGETS_WITHOUT_PB = ["PPARG", "EGFR", "ERBB2", "KDR", "PTGS2", "PTGES"]
+TARGETS_WITH_PB = ["PPARA", "PPARD", "ALOX-5", "PPARG", "EGFR", "ERBB2", "KDR", "PTGS2", "PTGES"]
+TARGETS_WITHOUT_PB = ""
 
 # Excel sheet indices
 SHEET_INTRA_LIGAND = 0  # Intra-Ligand_Poses (wide format, P1_*, P2_*, P3_*)
@@ -93,7 +93,7 @@ SHEET_INTER_LIGAND = 1  # Inter-Ligand_Ranking (179 rows, best pose per ligand)
 #   - NO additional transformation needed (already normalized)
 #   - Matrix orientation: Rows=Samples, Cols=Genes (GRNBoost2 compatible)
 # ============================================================
-CCLE_DATA_DIR = Path(r"D:\khoa_luan\protein\SCENIC")
+CCLE_DATA_DIR = Path(r"/home/labhhc5/Documents/workspace/D21/Duong Huy/pyscenic/pyscenic_data")
 
 # Model metadata with OncotreeLineage column for filtering
 CCLE_MODEL_CSV = CCLE_DATA_DIR / "Model.csv"
@@ -121,11 +121,11 @@ SCENIC_TF_LIST = SCENIC_RESOURCE_DIR / "hs_hgnc_tfs.txt"
 
 # Motif databases directory - USER MUST DOWNLOAD
 # Expected files: hg38_*.feather (e.g., hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather và hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather), https://resources.aertslab.org/cistarget/databases/homo_sapiens/hg38/refseq_r80/mc_v10_clust/gene_based/
-SCENIC_MOTIF_DB_DIR = Path(r"<USER_FILL_IN_PATH>")
+SCENIC_MOTIF_DB_DIR = Path(r"/home/labhhc5/Documents/workspace/D21/Duong Huy/pyscenic/pyscenic_data/scenic_motifs")
 
 # Motif annotations - USER MUST DOWNLOAD
 # Expected file: 	motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl (https://resources.aertslab.org/cistarget/motif2tf/)
-SCENIC_MOTIF_ANNOTATIONS = Path(r"<USER_FILL_IN_PATH>")
+SCENIC_MOTIF_ANNOTATIONS = Path(r"/home/labhhc5/Documents/workspace/D21/Duong Huy/pyscenic/pyscenic_data/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl")
 
 # ============================================================
 # LINEAGE DEFINITIONS (NEW v1.3)
@@ -196,7 +196,7 @@ COL_GRNBOOST2_IMPORTANCE = "importance"
 #   - User can run cisTarget later when resources available
 # ============================================================
 CISTARGET_NES_THRESHOLD = 3.0    # Normalized Enrichment Score threshold
-CISTARGET_RANK_THRESHOLD = 0.05  # Top 5% of ranked genes
+CISTARGET_RANK_THRESHOLD = 5000  # Top 5% of ranked genes
 CISTARGET_AUC_THRESHOLD = 0.05   # AUC threshold for motif recovery
 CISTARGET_MOTIF_SIMILARITY_FDR = 0.001  # FDR for motif similarity
 
@@ -226,7 +226,7 @@ LAYER2B_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer2B_Heterogeneous_RWR"
 #   - Score range 0-1000 (use >= 700 for high confidence)
 #   - More specific than full links (avoids co-expression/text-mining noise)
 # ============================================================
-STRING_DATA_DIR = Path(r"D:\khoa_luan\protein\string_files")
+STRING_DATA_DIR = Path(r"/home/labhhc5/Documents/workspace/D21/Duong Huy/pyscenic/pyscenic_data")
 STRING_PHYSICAL_LINKS_FILE = STRING_DATA_DIR / "9606.protein.physical.links.v12.0.txt.gz"
 STRING_LINKS_FILE = STRING_DATA_DIR / "9606.protein.links.v12.0.txt.gz"
 STRING_ALIASES_FILE = STRING_DATA_DIR / "9606.protein.aliases.v12.0.txt.gz"
