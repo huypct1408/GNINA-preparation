@@ -120,11 +120,11 @@ SCENIC_RESOURCE_DIR = CCLE_DATA_DIR
 SCENIC_TF_LIST = SCENIC_RESOURCE_DIR / "hs_hgnc_tfs.txt"
 
 # Motif databases directory - USER MUST DOWNLOAD
-# Expected files: hg38_*.feather (e.g., hg38_10kbp_up_10kbp_down_full_tx_v10.feather)
+# Expected files: hg38_*.feather (e.g., hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather và hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather), https://resources.aertslab.org/cistarget/databases/homo_sapiens/hg38/refseq_r80/mc_v10_clust/gene_based/
 SCENIC_MOTIF_DB_DIR = Path(r"<USER_FILL_IN_PATH>")
 
 # Motif annotations - USER MUST DOWNLOAD
-# Expected file: motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl
+# Expected file: 	motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl (https://resources.aertslab.org/cistarget/motif2tf/)
 SCENIC_MOTIF_ANNOTATIONS = Path(r"<USER_FILL_IN_PATH>")
 
 # ============================================================
