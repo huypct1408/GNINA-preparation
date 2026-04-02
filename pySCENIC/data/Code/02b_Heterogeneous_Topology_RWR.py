@@ -830,7 +830,7 @@ graph_stats = {
 
 stats_path = cfg.LAYER2B_OUTPUT_DIR / cfg.L2B_GRAPH_STATS_JSON
 with open(stats_path, 'w') as f:
-    json.dump(graph_stats, f, indent=2)
+    json.dump(graph_stats, f, indent=2, default=lambda x: x.item() if isinstance(x, np.generic) else str(x))
 
 print(f"\nSaved graph statistics: {stats_path}")
 for key, value in graph_stats.items():
