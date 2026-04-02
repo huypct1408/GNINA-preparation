@@ -274,7 +274,7 @@ if motif_db_available and motif_annot_available:
         
         # Save regulons
         regulon_output = cfg.LAYER2A_OUTPUT_DIR / cfg.L2A_REGULONS_CSV.format(lineage=lineage)
-        df_regulons.to_csv(regulon_output, index=False)
+        df_regulons.reset_index().to_csv(regulon_output, index=False)
         
         all_regulons[lineage] = regulons
         
