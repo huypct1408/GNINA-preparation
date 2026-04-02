@@ -66,18 +66,41 @@ if not cfg.CCLE_TPM_EXPRESSION_CSV.exists():
         f"File: OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv"
     )
 
+# Đọc file, lấy cột số thứ tự vô danh ngoài cùng làm index (index_col=0)
 tpm_df = pd.read_csv(cfg.CCLE_TPM_EXPRESSION_CSV, index_col=0)
-print(f"\nTPM expression loaded: {tpm_df.shape[0]} samples x {tpm_df.shape[1]} genes")
-print(f"Sample columns: {list(tpm_df.columns)[:3]}")
+print(f"\nRaw TPM loaded: {tpm_df.shape[0]} rows x {tpm_df.shape[1]} columns")
+
 # ============================================================
 # STAGE 3: PREPROCESSING
 # ============================================================
 
 logger.info("Preprocessing expression data...")
 
+# ---------------------------------------------------------
+# [HOTFIX DEPMAP 25Q3]: Chuẩn hóa cấu trúc ma trận
+# ---------------------------------------------------------
+# 1. Lọc chỉ giữ lại các bản ghi mặc định (tránh trùng lặp)
+if 'IsDefaultEntryForModel' in tpm_df.columns:
+    n_before = len(tpm_df)
+    tpm_df = tpm_df[tpm_df['IsDefaultEntryForModel'] == 'Yes']
+    print(f"Filtered Default Entries: {n_before} -> {len(tpm_df)} rows")
+
+# 2. Đặt ModelID làm Index chuẩn để có thể khớp với Model.csv
+if 'ModelID' in tpm_df.columns:
+    tpm_df = tpm_df.set_index('ModelID')
+
+# 3. Dọn dẹp rác metadata để ma trận CHỈ CÒN chứa dữ liệu Gen
+meta_cols = ['SequencingID', 'IsDefaultEntryForModel', 'ModelConditionID', 'IsDefaultEntryForMC']
+cols_to_drop = [c for c in meta_cols if c in tpm_df.columns]
+if cols_to_drop:
+    tpm_df = tpm_df.drop(columns=cols_to_drop)
+
+print(f"Processed TPM Matrix (Genes only): {tpm_df.shape[0]} samples x {tpm_df.shape[1]} genes")
+# ---------------------------------------------------------
+
 # CRITICAL: Strip Entrez IDs from gene names (DL5 compliance)
 # Column format: "GENE (ENTREZ_ID)" -> "GENE"
-print("Before stripping Entrez IDs:")
+print("\nBefore stripping Entrez IDs:")
 print(f"  Example columns: {list(tpm_df.columns)[:3]}")
 
 tpm_df.columns = [c.split(' (')[0] for c in tpm_df.columns]
@@ -104,7 +127,7 @@ tf_in_data = [tf for tf in tf_list if tf in tpm_df.columns]
 print(f"TFs present in expression data: {len(tf_in_data)} / {len(tf_list)}")
 
 # Verify matrix orientation (DL4 compliance)
-# GRNBoost2 expects: Rows=Samples, Cols=Genes (which is CCLE format)
+# GRNBoost2 expects: Rows=Samples (ACH-xxxx), Cols=Genes (TSPAN6, TNMD...)
 cfg.validate_deadlock_rules("grnboost2_orientation", transposed=False)
 logger.info("DL4 compliance: Matrix orientation correct (Rows=Samples, Cols=Genes)")
 # ============================================================
