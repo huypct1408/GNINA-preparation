@@ -1,39 +1,7 @@
 # Layer 2B: Heterogeneous Topology RWR Pipeline
 
 ## Purpose
-Integrate heterogeneous biological networks (SCENIC GRN + STRING PPI) and apply Random Walk with Restart (RWR) to identify drug-responsive hub genes.
-
-## Scientific Basis
-- **Heterogeneous Graph**: Combines transcriptional regulation (TF → Target) with physical protein interactions
-- **RWR Algorithm**: Propagates drug-target binding signals through the network topology
-- **P0 Calibration**: Seeds are weighted by CNN_VS × Expression (tissue-specific relevance)
-- **Delta-Network Analysis**: Compares Active vs Inactive compounds to eliminate housekeeping hubs
-
-## Architecture Decisions (Lead Architect Approved)
-1. **L2A Missing Handling**: Graceful Degradation - if SCENIC edges missing, use STRING-only graph
-2. **Active/Inactive Definition**: Top 10% vs Bottom 10% by CNN_VS (percentiles 90 and 10)
-3. **Gene Name Normalization**: Auto hyphen-removal + uppercase (ALOX-5 → ALOX5)
-4. **STRING Edge Type**: Use `physical.links` only (direct binding, score >= 700)
-
-## Deadlock Rules (MUST NOT VIOLATE)
-- **DL6**: DO NOT use Undirected Graph for SCENIC data; edges must be one-way (TF → Target)
-- **DL7**: DO NOT directly load CNN_VS into P0; MUST multiply by expression level
-- **DL8**: DO NOT conclude MoA from single compound; MUST run Delta-Network comparison
-
-## RWR Formula
-$$P_{0,i} = \frac{(CNN\_VS_i \times E_i) + \epsilon}{\sum_{j \in G} [(CNN\_VS_j \times E_j) + \epsilon]}$$
-
-Where $\epsilon$ = 0.001 (pseudo-count to prevent zero-division)
-
----
-**Version**: 1.0.0  
-**Config**: config_system.py v1.4  
-**Inputs**: Layer 1 P0 Vector, STRING PPI, SCENIC GRN (optional), MCF-7 Expression  
-**Outputs**: Top 50 Hub Genes per ligand, Delta-Network Summary, Full RWR Scores
----
-## Stage 1: Imports & Configuration
-
-Load all required libraries and verify config_system.py v1.4 settings.
+# Integrate heterogeneous biological networks (SCENIC GRN + STRING PPI) and apply Random Walk with Restart (RWR) to identify drug-responsive hub genes.
 # ============================================================
 # Stage 1: Imports & Configuration
 # ============================================================
