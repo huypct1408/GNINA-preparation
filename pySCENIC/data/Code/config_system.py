@@ -1,5 +1,5 @@
 # ============================================================
-# config_system.py - Central Configuration Hub v1.3
+# config_system.py - Central Configuration Hub v1.4
 # ============================================================
 # Purpose: Single source of truth for multi-layer analysis pipeline
 #          (Layer 1 -> Layer N). All notebooks import from here
@@ -22,6 +22,14 @@
 #          - pySCENIC resource paths (TF list, motif DBs)
 #          - Lineage definitions (OncotreeLineage level)
 #          - GRNBoost2 parameters
+#   v1.4 - Layer 2B: Heterogeneous Topology RWR configuration
+#          - STRING PPI data paths
+#          - RWR parameters (alpha, pseudo_count)
+#          - Target cell line configuration (MCF-7)
+#          - Active/Inactive percentile thresholds
+#          - Delta-Network analysis parameters
+#          - normalize_gene_name() utility function
+#          - Deadlock rules DL6, DL7, DL8
 # ============================================================
 
 from pathlib import Path
@@ -201,6 +209,118 @@ L2A_MASTER_ADJACENCIES_CSV = "L2A_Master_Adjacencies_AllLineages.csv"  # Raw GRN
 L2A_MASTER_REGULONS_CSV = "L2A_Master_Regulons_AllLineages.csv"        # cisTarget pruned
 L2A_AUC_MATRIX_CSV = "L2A_AUC_Matrix_{lineage}.csv"
 L2A_QC_PLOTS_DIR = "L2A_QC_Plots"
+
+# ============================================================
+# LAYER 2B OUTPUT DIRECTORIES (NEW v1.4)
+# ============================================================
+LAYER2B_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer2B_Heterogeneous_RWR"
+
+# ============================================================
+# STRING PPI DATA PATHS (NEW v1.4)
+# ============================================================
+# STRING Database v12.0 - Human protein-protein interactions
+# Download from: https://string-db.org/cgi/download
+#
+# Scientific basis:
+#   - physical.links contains direct binding interactions only
+#   - Score range 0-1000 (use >= 700 for high confidence)
+#   - More specific than full links (avoids co-expression/text-mining noise)
+# ============================================================
+STRING_DATA_DIR = Path(r"D:\khoa_luan\protein\string_files")
+STRING_PHYSICAL_LINKS_FILE = STRING_DATA_DIR / "9606.protein.physical.links.v12.0.txt.gz"
+STRING_LINKS_FILE = STRING_DATA_DIR / "9606.protein.links.v12.0.txt.gz"
+STRING_ALIASES_FILE = STRING_DATA_DIR / "9606.protein.aliases.v12.0.txt.gz"
+STRING_INFO_FILE = STRING_DATA_DIR / "9606.protein.info.v12.0.txt.gz"
+
+# STRING Configuration
+STRING_SPECIES_PREFIX = "9606."
+STRING_MIN_CONFIDENCE = 700  # High confidence threshold (0-1000 scale)
+
+# ============================================================
+# RWR PARAMETERS (NEW v1.4)
+# ============================================================
+# Random Walk with Restart via NetworkX PageRank
+#
+# Mathematical basis:
+#   P_{t+1} = (1-alpha) * W^T * P_t + alpha * P_0
+#
+# NetworkX convention:
+#   alpha = restart probability (return to seed nodes)
+#   alpha = 0.7 means 70% restart, 30% random walk
+#
+# Scientific basis:
+#   Higher alpha -> signal stays closer to drug targets
+#   Lower alpha -> signal diffuses broadly through network
+#   0.7 is optimal for drug target prioritization (Kohler et al.)
+# ============================================================
+RWR_ALPHA = 0.7              # Restart probability (damping factor)
+RWR_MAX_ITER = 100           # Maximum iterations for convergence
+RWR_TOL = 1e-6               # Convergence tolerance
+RWR_PSEUDO_COUNT = 0.001     # Epsilon for P0 calibration (prevents zero-division)
+
+# ============================================================
+# TARGET CELL LINE CONFIGURATION (NEW v1.4)
+# ============================================================
+# MCF-7: Human breast adenocarcinoma cell line
+# Used for P0 calibration with tissue-specific expression
+#
+# Scientific basis:
+#   - MCF-7 is estrogen receptor positive (ER+)
+#   - Well-characterized transcriptome in CCLE/DepMap
+#   - Representative of Breast lineage from Layer 2A
+# ============================================================
+TARGET_CELL_LINE = "MCF7"
+TARGET_CELL_LINE_MODEL_ID = "ACH-000019"
+
+# Alternative cell lines for multi-lineage analysis
+CELL_LINE_MODELS = {
+    "MCF7": "ACH-000019",       # Breast - ER+
+    "MDA-MB-231": "ACH-000768", # Breast - Triple negative
+    "A549": "ACH-000681",       # Lung - NSCLC
+    "Jurkat": "ACH-000995",     # Lymphoid - T-cell leukemia
+    "SW480": "ACH-000842",      # Bowel - Colorectal
+    "HEK293": "ACH-001085",     # Kidney - Reference (non-cancer)
+}
+
+# ============================================================
+# ACTIVE/INACTIVE THRESHOLD FOR DELTA-NETWORK (NEW v1.4)
+# ============================================================
+# Definition of "Active" vs "Inactive" compounds for comparative analysis
+#
+# Scientific basis:
+#   - Active = Top 10% by CNN_VS (highest predicted binding affinity)
+#   - Inactive = Bottom 10% by CNN_VS (weakest predicted binding)
+#   - Delta = RWR_Active - RWR_Inactive eliminates housekeeping hubs
+#   - Only drug-specific hubs survive delta filtering
+# ============================================================
+ACTIVE_PERCENTILE = 90       # Top 10% (100 - 90 = 10%)
+INACTIVE_PERCENTILE = 10     # Bottom 10%
+
+# ============================================================
+# LAYER 2B OUTPUT FILENAMES (NEW v1.4)
+# ============================================================
+L2B_TOP_HUB_GENES = 50       # Number of top hub genes to extract per ligand
+L2B_HUB_GENES_CSV = "L2B_Top50_Hub_Genes_{ligand_id}.csv"
+L2B_RWR_SCORES_CSV = "L2B_RWR_Full_Scores_{ligand_id}.csv"
+L2B_DELTA_NETWORK_CSV = "L2B_Delta_Network_Summary.csv"
+L2B_MASTER_RWR_CSV = "L2B_Master_RWR_AllLigands.csv"
+L2B_GRAPH_STATS_JSON = "L2B_Graph_Statistics.json"
+L2B_GRAPH_GRAPHML = "L2B_Heterogeneous_Graph.graphml"
+
+# ============================================================
+# LAYER 2B COLUMN NAMES (NEW v1.4)
+# ============================================================
+COL_RWR_SCORE = "RWR_Score"
+COL_RWR_RANK = "RWR_Rank"
+COL_DELTA_SCORE = "Delta_Score"
+COL_IS_DIRECT_TARGET = "Is_Direct_Target"
+COL_EDGE_TYPE = "Edge_Type"
+COL_GENE = "Gene"
+COL_GENE_NORMALIZED = "Gene_Normalized"
+
+# Edge type identifiers
+EDGE_TYPE_SCENIC = "SCENIC_GRN"    # TF -> Target (one-way)
+EDGE_TYPE_STRING = "STRING_PPI"    # Protein <-> Protein (bidirectional)
 
 # ============================================================
 # 9 TARGET PROTEINS
@@ -461,13 +581,15 @@ CNN_VS_NOTE = (
 # ============================================================
 PROJECT_METADATA = {
     "project_name": "Benzyl Ether Multi-Target Docking Campaign",
-    "version": "1.3.0",
-    "pipeline_version": "GNINA_v2.6.2 + pySCENIC",
+    "version": "1.4.0",
+    "pipeline_version": "GNINA_v2.6.2 + pySCENIC + NetworkX RWR",
     "n_ligands": N_LIGANDS_EXPECTED,
     "n_targets": N_TARGETS,
     "targets": TARGET_NAMES,
     "docking_engine": "GNINA (CNN-based scoring)",
     "grn_engine": "pySCENIC (GRNBoost2 + cisTarget)",
+    "rwr_engine": "NetworkX PageRank (RWR with alpha=0.7)",
+    "ppi_database": "STRING v12.0 (physical.links, score >= 700)",
     "scoring_functions": [
         "minimizedAffinity (Vina forcefield)",
         "CNNscore (pose probability)",
@@ -495,6 +617,7 @@ PROJECT_METADATA = {
 # DEADLOCK RULES - CHECKLIST
 # ============================================================
 DEADLOCK_RULES = {
+    # Layer 1 Rules
     "DL1_NORMALIZE_BEFORE_FILTER": (
         "ABSOLUTELY DO NOT normalize P0 vector if compounds with "
         f"dG > {DELTA_G_CUTOFF} kcal/mol have not been filtered out. "
@@ -508,6 +631,7 @@ DEADLOCK_RULES = {
         "ABSOLUTELY DO NOT simulate mutant proteins at Layer 1. "
         "Only use wild-type (WT) crystal structures."
     ),
+    # Layer 2A Rules
     "DL4_GRNBOOST2_ORIENTATION": (
         "DO NOT transpose expression matrix for GRNBoost2. "
         "CCLE TPM format (Rows=Samples, Cols=Genes) is already correct."
@@ -516,20 +640,66 @@ DEADLOCK_RULES = {
         "MUST strip Entrez IDs from gene names before GRNBoost2. "
         "Use: df.columns = [c.split(' (')[0] for c in df.columns]"
     ),
+    # Layer 2B Rules (NEW v1.4)
+    "DL6_DIRECTED_GRN": (
+        "ABSOLUTELY DO NOT use Undirected Graph for transcription data. "
+        "SCENIC edges must be one-way: TF -> Target. "
+        "Signal cannot flow backwards from gene to transcription factor. "
+        "This violates biological causality (Algebraic Conflict)."
+    ),
+    "DL7_P0_CALIBRATION": (
+        "ABSOLUTELY DO NOT directly load CNN_VS into P0 vector. "
+        "MUST multiply by expression level: P0,i = (CNN_VS_i * E_i) + epsilon. "
+        "Raw CNN_VS alone creates Competitive Reservoir Paradox - "
+        "a drug cannot influence a gene that isn't expressed."
+    ),
+    "DL8_DELTA_NETWORK": (
+        "ABSOLUTELY DO NOT conclude MoA from single compound analysis. "
+        "MUST run Delta-Network comparison: Active vs Inactive substances. "
+        "Delta_Score = RWR_Active - RWR_Inactive. "
+        "If graphs don't diverge, discard hypothesis (Against Confirmation Bias)."
+    ),
 }
 
 # ============================================================
 # UTILITY FUNCTIONS
 # ============================================================
+
+def normalize_gene_name(name: str) -> str:
+    """
+    Normalize gene names for cross-database matching.
+    
+    Architecture Decision (Lead Architect Approved):
+        Auto hyphen-removal + uppercase normalization
+        Example: ALOX-5 -> ALOX5, Alox5 -> ALOX5
+    
+    Scientific basis:
+        - STRING uses ENSP IDs mapped to HGNC symbols (no hyphens)
+        - CCLE/DepMap uses HGNC symbols (no hyphens)
+        - Layer 1 may use variant naming (e.g., ALOX-5)
+        - Normalization ensures consistent matching across layers
+    
+    Args:
+        name: Gene name (may contain hyphens, mixed case)
+    
+    Returns:
+        Normalized gene name (uppercase, no hyphens)
+    """
+    if name is None:
+        return ""
+    return name.replace("-", "").upper()
+
+
 def print_config_summary():
     """Print current configuration summary - call at start of each notebook."""
     print("=" * 64)
-    print("CONFIG SYSTEM - Central Configuration Hub v1.3")
+    print("CONFIG SYSTEM - Central Configuration Hub v1.4")
     print("=" * 64)
     print(f"Project root:       {PROJECT_ROOT}")
     print(f"Docking data:       {DOCKING_PARENT_DIR}")
     print(f"Layer 1 output:     {LAYER1_OUTPUT_DIR}")
     print(f"Layer 2A output:    {LAYER2A_OUTPUT_DIR}")
+    print(f"Layer 2B output:    {LAYER2B_OUTPUT_DIR}")
     print(f"Targets:            {N_TARGETS} ({', '.join(TARGET_NAMES)})")
     print(f"  Track 1 (PB):     {', '.join(TARGETS_WITH_PB)}")
     print(f"  Track 2 (no PB):  {', '.join(TARGETS_WITHOUT_PB)}")
@@ -545,6 +715,14 @@ def print_config_summary():
     print(f"  Lineages:         {', '.join(LINEAGES_OF_INTEREST)}")
     print(f"  GRNBoost2 workers:{GRNBOOST2_N_WORKERS}")
     print(f"  Min samples:      {MIN_SAMPLES_PER_LINEAGE}")
+    print("-" * 64)
+    print("Layer 2B (Heterogeneous RWR):")
+    print(f"  STRING data dir:  {STRING_DATA_DIR}")
+    print(f"  STRING threshold: {STRING_MIN_CONFIDENCE} (high confidence)")
+    print(f"  RWR alpha:        {RWR_ALPHA} (restart probability)")
+    print(f"  Target cell line: {TARGET_CELL_LINE} ({TARGET_CELL_LINE_MODEL_ID})")
+    print(f"  Active/Inactive:  Top {100-ACTIVE_PERCENTILE}% / Bottom {INACTIVE_PERCENTILE}%")
+    print(f"  Top hub genes:    {L2B_TOP_HUB_GENES}")
     print("=" * 64)
 
 
@@ -558,6 +736,11 @@ def validate_deadlock_rules(step: str, **context):
       A - Simple assertion-based validation
       R - Critical for pipeline integrity
       T - O(1) per check
+    
+    Layer 2B Steps:
+      - directed_grn: Ensure SCENIC edges are directed (DL6)
+      - p0_calibration: Ensure P0 = CNN_VS * Expression (DL7)
+      - delta_network: Ensure Active vs Inactive comparison (DL8)
     """
     if step == "pre_normalize":
         assert context.get("filtered", False), (
@@ -584,6 +767,22 @@ def validate_deadlock_rules(step: str, **context):
             f"DEADLOCK VIOLATION - DL5:\n"
             f"{DEADLOCK_RULES['DL5_GENE_NAME_FORMAT']}"
         )
+    # Layer 2B Rules (NEW v1.4)
+    elif step == "directed_grn":
+        assert context.get("is_directed", False), (
+            f"DEADLOCK VIOLATION - DL6:\n"
+            f"{DEADLOCK_RULES['DL6_DIRECTED_GRN']}"
+        )
+    elif step == "p0_calibration":
+        assert context.get("multiplied_by_expression", False), (
+            f"DEADLOCK VIOLATION - DL7:\n"
+            f"{DEADLOCK_RULES['DL7_P0_CALIBRATION']}"
+        )
+    elif step == "delta_network":
+        assert context.get("compared_active_inactive", False), (
+            f"DEADLOCK VIOLATION - DL8:\n"
+            f"{DEADLOCK_RULES['DL8_DELTA_NETWORK']}"
+        )
 
 
 def check_scenic_resources() -> dict:
@@ -603,19 +802,64 @@ def check_scenic_resources() -> dict:
     }
 
 
+def check_layer2b_resources() -> dict:
+    """
+    Check availability of Layer 2B resources.
+    
+    Returns:
+        dict with keys for each required resource
+        Values: True if available, False otherwise
+    
+    Resources checked:
+        - STRING physical links (required)
+        - STRING aliases (required for gene name mapping)
+        - Layer 1 P0 Vector (required)
+        - Layer 2A SCENIC GRN (optional - graceful degradation)
+        - CCLE expression (required for P0 calibration)
+    """
+    # Layer 1 P0 Vector path
+    l1_p0_path = LAYER1_OUTPUT_DIR / "L1_P0_Vector_Long.csv"
+    
+    # Layer 2A SCENIC GRN path (optional)
+    l2a_grn_path = LAYER2A_OUTPUT_DIR / L2A_MASTER_REGULONS_CSV
+    
+    return {
+        "string_physical_links": STRING_PHYSICAL_LINKS_FILE.exists(),
+        "string_aliases": STRING_ALIASES_FILE.exists(),
+        "string_info": STRING_INFO_FILE.exists(),
+        "layer1_p0_vector": l1_p0_path.exists(),
+        "layer2a_scenic_grn": l2a_grn_path.exists(),  # Optional - graceful degradation
+        "ccle_model": CCLE_MODEL_CSV.exists(),
+        "ccle_expression": Path(CCLE_DATA_DIR / "OmicsExpressionRawReadCountH_thesis_cell_lines_only.csv").exists(),
+    }
+
+
 # ============================================================
 # Self-test on import
 # ============================================================
 if __name__ == "__main__":
     print_config_summary()
-    print("\nconfig_system.py v1.3 loaded successfully.")
+    print("\nconfig_system.py v1.4 loaded successfully.")
     print(f"   Deadlock rules: {list(DEADLOCK_RULES.keys())}")
     pb_configured = sum(1 for v in POSEBUSTERS_PATHS.values() if v is not None)
     print(f"   PoseBusters paths configured: {pb_configured}/{len(POSEBUSTERS_PATHS)}")
     print(f"   Track 1 targets: {TARGETS_WITH_PB}")
     print(f"   Track 2 targets: {TARGETS_WITHOUT_PB}")
-    print("\n   SCENIC Resources:")
+    print("\n   SCENIC Resources (Layer 2A):")
     resources = check_scenic_resources()
     for key, available in resources.items():
         status = "OK" if available else "MISSING"
         print(f"      {key}: {status}")
+    print("\n   Layer 2B Resources:")
+    l2b_resources = check_layer2b_resources()
+    for key, available in l2b_resources.items():
+        status = "OK" if available else "MISSING"
+        if key == "layer2a_scenic_grn" and not available:
+            status = "MISSING (will use STRING-only graph)"
+        print(f"      {key}: {status}")
+    print("\n   Gene Name Normalization Test:")
+    test_cases = [("ALOX-5", "ALOX5"), ("Alox5", "ALOX5"), ("PPARG", "PPARG")]
+    for original, expected in test_cases:
+        result = normalize_gene_name(original)
+        match = "PASS" if result == expected else "FAIL"
+        print(f"      {original} -> {result} [{match}]")
