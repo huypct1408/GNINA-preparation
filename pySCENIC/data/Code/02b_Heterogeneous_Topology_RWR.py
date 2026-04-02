@@ -2,6 +2,9 @@
 
 ## Purpose
 # Integrate heterogeneous biological networks (SCENIC GRN + STRING PPI) and apply Random Walk with Restart (RWR) to identify drug-responsive hub genes.
+## Stage 1: Imports & Configuration
+
+Load all required libraries and verify config_system.py v1.4 settings.
 # ============================================================
 # Stage 1: Imports & Configuration
 # ============================================================
@@ -236,15 +239,15 @@ print(f"  Total high-confidence edges: {len(string_ppi_mapped):,}")
 print(f"  Unique genes: {pd.concat([string_ppi_mapped['Gene1_Normalized'], string_ppi_mapped['Gene2_Normalized']]).nunique():,}")
 print(f"  Score range: {string_ppi_mapped['combined_score'].min()} - {string_ppi_mapped['combined_score'].max()}")
 ---
-## Stage 4: Load MCF-7 TPM Expression
+## Stage 4: Load Cell Line TPM Expression
 
 Load cell line-specific expression data for P0 calibration.  
 Expression level determines tissue relevance of drug target signal.
 # ============================================================
-# Stage 4: Load MCF-7 TPM Expression
+# Stage 4: Load Cell Line TPM Expression
 # ============================================================
 print("="*64)
-print("STAGE 4: LOAD MCF-7 EXPRESSION")
+print(f"STAGE 4: LOAD {cfg.TARGET_CELL_LINE} EXPRESSION")
 print("="*64)
 
 # Load expression data
@@ -268,74 +271,79 @@ print(f"  Expression type: {EXPRESSION_TYPE}")
 expression_df = pd.read_csv(EXPRESSION_FILE, index_col=0)
 print(f"  Shape: {expression_df.shape} (samples x genes)")
 print(f"  Samples: {list(expression_df.index)}")
-# Find MCF-7 sample
+# Find target cell line sample
 print(f"\nSearching for target cell line: {cfg.TARGET_CELL_LINE} ({cfg.TARGET_CELL_LINE_MODEL_ID})")
 
 # Check if ModelID is in index
 if cfg.TARGET_CELL_LINE_MODEL_ID in expression_df.index:
-    mcf7_expression = expression_df.loc[cfg.TARGET_CELL_LINE_MODEL_ID]
-    print(f"  Found MCF-7 by ModelID: {cfg.TARGET_CELL_LINE_MODEL_ID}")
+    cell_line_expression = expression_df.loc[cfg.TARGET_CELL_LINE_MODEL_ID]
+    print(f"  Found {cfg.TARGET_CELL_LINE} by ModelID: {cfg.TARGET_CELL_LINE_MODEL_ID}")
 else:
-    # Try to find by cell line name
-    matching_samples = [idx for idx in expression_df.index if 'MCF7' in idx.upper() or 'MCF-7' in idx.upper()]
+    # Try to find by cell line name (dynamic matching)
+    # Normalize target name: remove hyphens, underscores, convert to uppercase
+    target_normalized = cfg.TARGET_CELL_LINE.upper().replace('-', '').replace('_', '')
+    matching_samples = [
+        idx for idx in expression_df.index 
+        if target_normalized in idx.upper().replace('-', '').replace('_', '')
+    ]
     if matching_samples:
-        mcf7_expression = expression_df.loc[matching_samples[0]]
-        print(f"  Found MCF-7 by name matching: {matching_samples[0]}")
+        cell_line_expression = expression_df.loc[matching_samples[0]]
+        print(f"  Found {cfg.TARGET_CELL_LINE} by name matching: {matching_samples[0]}")
     else:
-        raise ValueError(f"MCF-7 sample not found in expression data!")
+        raise ValueError(f"{cfg.TARGET_CELL_LINE} sample not found in expression data!")
 
-print(f"  Genes with expression data: {len(mcf7_expression):,}")
-print(f"  Expression range: {mcf7_expression.min():.2f} - {mcf7_expression.max():.2f}")
+print(f"  Genes with expression data: {len(cell_line_expression):,}")
+print(f"  Expression range: {cell_line_expression.min():.2f} - {cell_line_expression.max():.2f}")
 # Clean gene names (strip Entrez IDs if present)
 print("\nNormalizing gene names in expression data...")
 
 # Check if gene names have Entrez ID suffix like "GENE (12345)"
-sample_genes = list(mcf7_expression.index[:5])
+sample_genes = list(cell_line_expression.index[:5])
 print(f"  Sample gene names: {sample_genes}")
 
 # Strip Entrez IDs if present (DL5 compliance)
-clean_gene_names = [g.split(' (')[0] for g in mcf7_expression.index]
-mcf7_expression.index = clean_gene_names
+clean_gene_names = [g.split(' (')[0] for g in cell_line_expression.index]
+cell_line_expression.index = clean_gene_names
 
 # Normalize gene names
-normalized_gene_names = [cfg.normalize_gene_name(g) for g in mcf7_expression.index]
-mcf7_expression.index = normalized_gene_names
+normalized_gene_names = [cfg.normalize_gene_name(g) for g in cell_line_expression.index]
+cell_line_expression.index = normalized_gene_names
 
 # Handle duplicates (take max expression)
-mcf7_expression = mcf7_expression.groupby(mcf7_expression.index).max()
+cell_line_expression = cell_line_expression.groupby(cell_line_expression.index).max()
 
-print(f"  Unique normalized genes: {len(mcf7_expression):,}")
-print(f"  Sample normalized names: {list(mcf7_expression.index[:5])}")
+print(f"  Unique normalized genes: {len(cell_line_expression):,}")
+print(f"  Sample normalized names: {list(cell_line_expression.index[:5])}")
 
 # Create expression dictionary for fast lookup
-expression_dict = mcf7_expression.to_dict()
+expression_dict = cell_line_expression.to_dict()
 # Expression distribution
-print("\nMCF-7 Expression Distribution:")
-print(mcf7_expression.describe())
+print(f"\n{cfg.TARGET_CELL_LINE} Expression Distribution:")
+print(cell_line_expression.describe())
 
 # Visualize
 fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
 # Histogram
-axes[0].hist(mcf7_expression.values, bins=50, color='steelblue', edgecolor='white', alpha=0.7)
+axes[0].hist(cell_line_expression.values, bins=50, color='steelblue', edgecolor='white', alpha=0.7)
 axes[0].set_xlabel('Expression Level (TPM or Read Count)')
 axes[0].set_ylabel('Frequency')
-axes[0].set_title('MCF-7 Gene Expression Distribution')
-axes[0].axvline(mcf7_expression.median(), color='red', linestyle='--', label=f'Median: {mcf7_expression.median():.2f}')
+axes[0].set_title(f'{cfg.TARGET_CELL_LINE} Gene Expression Distribution')
+axes[0].axvline(cell_line_expression.median(), color='red', linestyle='--', label=f'Median: {cell_line_expression.median():.2f}')
 axes[0].legend()
 
 # Log-transformed
-log_expr = np.log10(mcf7_expression.values + 1)
+log_expr = np.log10(cell_line_expression.values + 1)
 axes[1].hist(log_expr, bins=50, color='darkgreen', edgecolor='white', alpha=0.7)
 axes[1].set_xlabel('log10(Expression + 1)')
 axes[1].set_ylabel('Frequency')
-axes[1].set_title('MCF-7 Log-Transformed Expression')
+axes[1].set_title(f'{cfg.TARGET_CELL_LINE} Log-Transformed Expression')
 
 plt.tight_layout()
-plt.savefig(cfg.LAYER2B_OUTPUT_DIR / "L2B_MCF7_Expression_Distribution.png", dpi=150, bbox_inches='tight')
+plt.savefig(cfg.LAYER2B_OUTPUT_DIR / f"L2B_{cfg.TARGET_CELL_LINE}_Expression_Distribution.png", dpi=150, bbox_inches='tight')
 plt.show()
 
-print(f"\nSaved: L2B_MCF7_Expression_Distribution.png")
+print(f"\nSaved: L2B_{cfg.TARGET_CELL_LINE}_Expression_Distribution.png")
 ---
 ## Stage 5: Assemble Heterogeneous Graph & P0 Calibration
 
