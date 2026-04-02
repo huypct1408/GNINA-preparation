@@ -188,7 +188,7 @@ for target_name in cfg.TARGETS_WITH_PB:
     
     # Identify ligands that need rescue (Mode 1 invalid but have valid poses)
     # First, find Mode 1 for each ligand
-    df_mode1 = df_poses[df_poses[cfg.COL_GNINA_MODEL] == 1].copy()
+    df_mode1 = df_poses[df_poses[cfg.COL_POSE_ID] == 'pose_000'].copy()
     mode1_invalid_ligands = df_mode1[df_mode1[cfg.COL_PB_VALID] == False]['ligand_id'].unique()
     
     # Rescued = Mode 1 invalid BUT has valid poses in Mode 2+
