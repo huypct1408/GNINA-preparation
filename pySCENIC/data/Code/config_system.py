@@ -241,19 +241,20 @@ STRING_MIN_CONFIDENCE = 700  # High confidence threshold (0-1000 scale)
 # ============================================================
 # Random Walk with Restart via NetworkX PageRank
 #
-# Mathematical basis:
-#   P_{t+1} = (1-alpha) * W^T * P_t + alpha * P_0
+# Mathematical basis (NetworkX implementation):
+#   P_{t+1} = alpha * W^T * P_t + (1-alpha) * P_0
 #
 # NetworkX convention:
-#   alpha = restart probability (return to seed nodes)
-#   alpha = 0.7 means 70% restart, 30% random walk
+#   alpha = DAMPING FACTOR (probability to continue walking)
+#   (1 - alpha) = RESTART PROBABILITY (teleport back to seed nodes)
+#   Setting alpha = 0.3 means: 30% random walk, 70% restart!
 #
 # Scientific basis:
-#   Higher alpha -> signal stays closer to drug targets
-#   Lower alpha -> signal diffuses broadly through network
-#   0.7 is optimal for drug target prioritization (Kohler et al.)
+#   Higher restart (lower alpha) -> signal stays tightly around drug targets.
+#   Lower restart (higher alpha) -> signal diffuses broadly into the hairball.
+#   Kohler et al. recommends a 0.7 restart probability -> We set alpha = 0.3
 # ============================================================
-RWR_ALPHA = 0.7              # Restart probability (damping factor)
+RWR_ALPHA = 0.3              # Damping factor (yields 70% restart probability)
 RWR_MAX_ITER = 100           # Maximum iterations for convergence
 RWR_TOL = 1e-6               # Convergence tolerance
 RWR_PSEUDO_COUNT = 0.001     # Epsilon for P0 calibration (prevents zero-division)
@@ -269,7 +270,7 @@ RWR_PSEUDO_COUNT = 0.001     # Epsilon for P0 calibration (prevents zero-divisio
 #   - Well-characterized transcriptome in CCLE/DepMap
 #   - Representative of Breast lineage from Layer 2A
 # ============================================================
-TARGET_CELL_LINE = "MCF7"
+TARGET_CELL_LINE = "MCF7" # Jurkat -> HEK-293 -> A549 -> SW480 -> MCF-7 và MDA-MB-231 (multi-lineage analysis)
 TARGET_CELL_LINE_MODEL_ID = "ACH-000019"
 
 # Alternative cell lines for multi-lineage analysis
