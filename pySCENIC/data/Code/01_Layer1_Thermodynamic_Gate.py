@@ -101,7 +101,7 @@ def load_from_inter_ligand(target_name: str) -> Optional[pd.DataFrame]:
     xlsx_path = xlsx_files[0]
     logger.info(f"{target_name}: Loading from {xlsx_path.name} Sheet 1 (Inter-Ligand)")
     
-    df = pd.read_excel(xlsx_path, sheet_name=cfg.SHEET_INTER_LIGAND, engine='openpyxl')
+    df = pd.read_excel(xlsx_path, sheet_name=cfg.SHEET_INTER_LIGAND, engine='openpyxl', skiprows=1)
     
     # Standardize column names
     col_mapping = {
@@ -136,7 +136,7 @@ def load_metadata_from_excel(target_name: str) -> pd.DataFrame:
         return pd.DataFrame()
     
     xlsx_path = xlsx_files[0]
-    df = pd.read_excel(xlsx_path, sheet_name=cfg.SHEET_INTER_LIGAND, engine='openpyxl')
+    df = pd.read_excel(xlsx_path, sheet_name=cfg.SHEET_INTER_LIGAND, engine='openpyxl', skiprows=1)
     
     # Extract just ID, Original_Name, SMILES
     col_mapping = {'ID': 'ligand_id', 'Original_Name': 'orig_name', 'SMILES': 'smiles'}
@@ -356,125 +356,6 @@ print("\n" + "="*64)
 print("STAGE 6: P0 ASSEMBLY (Per-Target Normalization + Pivot Matrix)")
 print("="*64)
 
-def calculate_p0_raw_weight(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Calculate P0_raw_weight using PER-TARGET Normalization.
-    
-    HOTFIX #1: Inverted Affinity (more negative = better score)
-    HOTFIX #2: Per-Target Normalization to prevent cross-protein scoring bias
-               (avoids "large binding pocket bias" where deep pockets like MMP-9
-               naturally produce more negative dG than shallow pockets like EGFR)
-    
-    Formula (applied PER TARGET):
-      CNN_VS_norm = (CNN_VS - target_min) / (target_max - target_min)
-      Affinity_norm = (target_max - Affinity) / (target_max - target_min)  # INVERTED
-      P0_raw_weight = alpha * CNN_VS_norm + (1 - alpha) * Affinity_norm
-    
-    Returns:
-      Tuple[df_long, df_matrix] - Long format for QC, Wide matrix for Layer 2
-    """
-    df = df.copy()
-    
-    # ---------------------------------------------------------
-    # 1. CNN_VS normalization (PER-TARGET) - Higher is better
-    # ---------------------------------------------------------
-    cnn_min = df.groupby('target')['CNN_VS'].transform('min')
-    cnn_max = df.groupby('target')['CNN_VS'].transform('max')
-    cnn_range = cnn_max - cnn_min
-    
-    # np.where handles edge case where all values are identical (range = 0)
-    df[cfg.COL_CNN_VS_NORM] = np.where(
-        cnn_range > 0,
-        (df['CNN_VS'] - cnn_min) / cnn_range,
-        0.5  # Neutral value if no differentiation
-    )
-    
-    # ---------------------------------------------------------
-    # 2. Affinity normalization (PER-TARGET & INVERTED)
-    #    More negative (better binding) -> Higher score
-    # ---------------------------------------------------------
-    aff_min = df.groupby('target')['Affinity_kcal'].transform('min')  # Best (most negative)
-    aff_max = df.groupby('target')['Affinity_kcal'].transform('max')  # Worst (least negative)
-    aff_range = aff_max - aff_min
-    
-    df[cfg.COL_AFFINITY_NORM] = np.where(
-        aff_range > 0,
-        (aff_max - df['Affinity_kcal']) / aff_range,  # INVERTED
-        0.5
-    )
-    
-    # ---------------------------------------------------------
-    # 3. Calculate P0_raw_weight
-    # ---------------------------------------------------------
-    alpha = cfg.ALPHA_CNN_VS_WEIGHT  # 0.7
-    df[cfg.COL_P0_RAW_WEIGHT] = (
-        alpha * df[cfg.COL_CNN_VS_NORM] + 
-        (1 - alpha) * df[cfg.COL_AFFINITY_NORM]
-    )
-    
-    # ---------------------------------------------------------
-    # 4. Log Per-Target Statistics (for transparency)
-    # ---------------------------------------------------------
-    print(f"\nPer-Target Normalization Statistics (HOTFIX #2):")
-    print(f"{'Target':<10} {'CNN_VS Range':<20} {'Affinity Range':<22} {'P0 Range':<18} {'N':<5}")
-    print("-" * 80)
-    for target in sorted(df['target'].unique()):
-        t_df = df[df['target'] == target]
-        print(f"{target:<10} "
-              f"[{t_df['CNN_VS'].min():.3f}, {t_df['CNN_VS'].max():.3f}]      "
-              f"[{t_df['Affinity_kcal'].min():.2f}, {t_df['Affinity_kcal'].max():.2f}]      "
-              f"[{t_df[cfg.COL_P0_RAW_WEIGHT].min():.3f}, {t_df[cfg.COL_P0_RAW_WEIGHT].max():.3f}]   "
-              f"{len(t_df)}")
-    
-    print(f"\nAlpha (CNN_VS weight): {alpha}")
-    print(f"Global P0_raw_weight stats: mean={df[cfg.COL_P0_RAW_WEIGHT].mean():.4f}, "
-          f"std={df[cfg.COL_P0_RAW_WEIGHT].std():.4f}")
-    
-    # ==========================================
-    # PIVOT TO WIDE MATRIX FOR LAYER 2 (RWR)
-    # ==========================================
-    # Create matrix: Ligand (rows) x Target (columns)
-    p0_matrix = df.pivot_table(
-        index='lig_id',
-        columns='target',
-        values=cfg.COL_P0_RAW_WEIGHT,
-        aggfunc='first'
-    )
-    
-    # Merge metadata (SMILES, orig_name) back into matrix
-    meta_cols = ['lig_id', 'orig_name', 'smiles']
-    available_meta = [c for c in meta_cols if c in df.columns]
-    if available_meta:
-        meta_df = df.drop_duplicates('lig_id')[available_meta].set_index('lig_id')
-        p0_matrix = p0_matrix.join(meta_df)
-    
-    # Reorder columns: metadata first, then targets in config order
-    target_cols = [t for t in cfg.TARGET_NAMES if t in p0_matrix.columns]
-    meta_first = [c for c in ['orig_name', 'smiles'] if c in p0_matrix.columns]
-    final_cols = meta_first + target_cols
-    p0_matrix = p0_matrix[final_cols]
-    
-    print(f"\n[PIVOT SUCCESS] P0 Matrix Shape: {p0_matrix.shape[0]} ligands x {p0_matrix.shape[1]} columns")
-    print(f"  - Metadata columns: {meta_first}")
-    print(f"  - Target columns: {target_cols}")
-    
-    return df, p0_matrix
-
-
-# Execute P0 calculation
-df_with_p0_long, df_p0_matrix = calculate_p0_raw_weight(df_passed)
-
-# For backward compatibility (QC uses df_with_p0)
-df_with_p0 = df_with_p0_long
-
-print("\nTop 10 compounds by P0_raw_weight (Long format):")
-top10_cols = ['lig_id', 'target', 'CNN_VS', 'Affinity_kcal', cfg.COL_P0_RAW_WEIGHT, cfg.COL_PB_STATUS]
-available_cols = [c for c in top10_cols if c in df_with_p0.columns]
-top10 = df_with_p0.nlargest(10, cfg.COL_P0_RAW_WEIGHT)[available_cols]
-print(top10.to_string(index=False))
-
-print("\nP0 Matrix Sample (First 5 ligands, Wide format for Layer 2):")
-display(df_p0_matrix.head())
 # =============================================================================
 # STAGE 7: DEADLOCK VALIDATION
 # =============================================================================
