@@ -342,19 +342,63 @@ for target in cfg.TARGET_NAMES:
     rate = 100 * n_pass / n_tot if n_tot > 0 else 0
     track = "Track1" if target in cfg.TARGETS_WITH_PB else "Track2"
     print(f"  {target} [{track}]: {n_pass}/{n_tot} ({rate:.1f}%)")
+
 # =============================================================================
 # STAGE 6: P0 ASSEMBLY
-# =============================================================================
-# HOTFIX #1: Inverted Affinity Normalization (more negative = better)
-# HOTFIX #2: PER-TARGET Normalization (avoid binding pocket size bias)
-# 
-# Outputs TWO DataFrames:
-#   1. df_with_p0_long: Long format (each row = ligand-target pair) for QC
-#   2. df_p0_matrix: Wide format (rows=ligands, cols=targets) for Layer 2 RWR
 # =============================================================================
 print("\n" + "="*64)
 print("STAGE 6: P0 ASSEMBLY (Per-Target Normalization + Pivot Matrix)")
 print("="*64)
+
+df_with_p0 = df_passed.copy()
+
+# Per-target normalization
+for target in df_with_p0['target'].unique():
+    mask = df_with_p0['target'] == target
+    
+    # CNN_VS normalization (min-max, higher is better)
+    cnn_vs_vals = df_with_p0.loc[mask, 'CNN_VS']
+    cnn_vs_min = cnn_vs_vals.min()
+    cnn_vs_max = cnn_vs_vals.max()
+    cnn_vs_range = cnn_vs_max - cnn_vs_min
+    if cnn_vs_range > 0:
+        df_with_p0.loc[mask, cfg.COL_CNN_VS_NORM] = (cnn_vs_vals - cnn_vs_min) / cnn_vs_range
+    else:
+        df_with_p0.loc[mask, cfg.COL_CNN_VS_NORM] = 1.0
+    
+    # Affinity normalization (INVERTED: more negative = higher score)
+    aff_vals = df_with_p0.loc[mask, 'Affinity_kcal']
+    aff_min = aff_vals.min()   # most negative = best
+    aff_max = aff_vals.max()   # least negative = worst
+    aff_range = aff_max - aff_min
+    if aff_range > 0:
+        # Invert: most negative -> 1.0, least negative -> 0.0
+        df_with_p0.loc[mask, cfg.COL_AFFINITY_NORM] = (aff_max - aff_vals) / aff_range
+    else:
+        df_with_p0.loc[mask, cfg.COL_AFFINITY_NORM] = 1.0
+
+# Calculate P0_raw_weight
+df_with_p0[cfg.COL_P0_RAW_WEIGHT] = (
+    cfg.ALPHA_CNN_VS_WEIGHT * df_with_p0[cfg.COL_CNN_VS_NORM] +
+    cfg.ALPHA_AFFINITY_WEIGHT * df_with_p0[cfg.COL_AFFINITY_NORM]
+)
+
+print(f"P0 computed for {len(df_with_p0)} records")
+print(f"P0_raw_weight range: [{df_with_p0[cfg.COL_P0_RAW_WEIGHT].min():.4f}, "
+      f"{df_with_p0[cfg.COL_P0_RAW_WEIGHT].max():.4f}]")
+
+# --- Long format output (for QC) ---
+df_with_p0_long = df_with_p0.copy()
+
+# --- Wide matrix output (for Layer 2 RWR) ---
+df_p0_matrix = df_with_p0.pivot_table(
+    index='lig_id',
+    columns='target',
+    values=cfg.COL_P0_RAW_WEIGHT,
+    aggfunc='first'
+).fillna(0.0)
+
+print(f"P0 matrix shape: {df_p0_matrix.shape[0]} ligands x {df_p0_matrix.shape[1]} targets")
 
 # =============================================================================
 # STAGE 7: DEADLOCK VALIDATION
