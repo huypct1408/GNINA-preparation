@@ -830,7 +830,7 @@ def check_layer2b_resources() -> dict:
         "layer1_p0_vector": l1_p0_path.exists(),
         "layer2a_scenic_grn": l2a_grn_path.exists(),  # Optional - graceful degradation
         "ccle_model": CCLE_MODEL_CSV.exists(),
-        "ccle_expression": Path(CCLE_DATA_DIR / "OmicsExpressionRawReadCountH_thesis_cell_lines_only.csv").exists(),
+        "ccle_expression": Path(CCLE_DATA_DIR / "OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv").exists(),
     }
 
 
