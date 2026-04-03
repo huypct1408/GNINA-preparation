@@ -101,7 +101,7 @@ logger.info("Layer 3A: CRISPR Essentiality Validation initialized")
 logger.info(f"Primary cell line: {cfg.L3A_PRIMARY_CELL_LINE} ({cfg.L3A_PRIMARY_MODEL_ID})")
 logger.info(f"Cancer cell lines: {list(cfg.LAYER3A_CANCER_CELL_LINES.keys())}")
 logger.info(f"P(dep) threshold: > {cfg.CRISPR_PDEP_THRESHOLD}")
----
+
 ## Stage 2: Load L2B Delta Network (Filter Positive Delta, Top 60)
 # ============================================================
 # Stage 2: Load L2B Delta Network Summary
@@ -183,7 +183,7 @@ if len(changed) > 0:
     print(changed[['Gene', cfg.COL_GENE_NORMALIZED]].to_string(index=False))
 else:
     print("\nNo gene name normalization needed.")
----
+
 ## Stage 3: Load CRISPR Dependency Data
 # ============================================================
 # Stage 3: Load CRISPR Gene Dependency Data
@@ -254,7 +254,7 @@ if not all_found:
     logger.warning("Some cell lines not found in CRISPR data!")
 else:
     logger.info("All cancer cell lines found in CRISPR data.")
----
+
 ## Stage 4: Cross-Reference & Filter (5 Cancer Cell Lines)
 # ============================================================
 # Stage 4: Query CRISPR P(dep) for Top 50 Genes
@@ -411,7 +411,7 @@ else:
     print("\nTop 5 genes by Max P(dep):")
     display_cols = ['Gene', 'Delta_Score', cfg.COL_MAX_P_DEP, cfg.COL_ESSENTIAL_IN_N_LINES]
     print(results.nlargest(5, cfg.COL_MAX_P_DEP)[display_cols].to_string(index=False))
----
+
 ## Stage 5: Generate Outputs & Visualizations
 # ============================================================
 # Stage 5A: Save Essential Targets CSV
@@ -633,7 +633,7 @@ if len(df_heatmap) > 0:
     plt.show()
 else:
     print("\nNo genes with CRISPR data available for heatmap.")
----
+
 ## Stage 6: Pipeline Summary & Next Steps
 # ============================================================
 # Stage 6: Final Pipeline Summary
