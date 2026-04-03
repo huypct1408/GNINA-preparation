@@ -1,5 +1,39 @@
 # Layer 3A: CRISPR Essentiality Validation (Physical Death)
+"""
+# Layer 3A: CRISPR Essentiality Validation (Physical Death)
 
+## SMART Goal
+- **S**pecific: Identify which gene hubs from Layer 2B Delta Network are CRISPR-essential in cancer cells
+- **M**easurable: Filter Top 50 positive-delta genes with P(dep) > 0.8 in any of 5 cancer cell lines
+- **A**chievable: Using DepMap CRISPRGeneDependency.csv (1,186 cell lines, 18,435 genes)
+- **R**elevant: Essential genes = knockout causes cancer cell death = MoA validation
+- **T**ime-bound: Single notebook execution (~5-10 minutes)
+
+## Scientific Rationale
+
+**Why Positive Delta Only (DL10)**:
+- `Delta_Score = RWR_Active - RWR_Inactive`
+- **Positive delta** = genes elevated when ACTIVE (effective) drugs are present
+- **Negative delta** = genes elevated when INACTIVE (failing) drugs are present
+- Including negative delta contaminates the essential gene list with non-MoA genes
+
+**Why P(dep) > 0.8 (DL11)**:
+- P(dep) is probability that gene knockout reduces cell viability
+- P(dep) > 0.8 = high-confidence essential gene (80%+ probability)
+- P(dep) 0.5-0.8 = context-dependent (may be essential in some conditions)
+- P(dep) < 0.5 = likely not essential
+
+**Why Exclude HEK-293 (DL12)**:
+- HEK-293 is immortalized (non-cancer) cell line
+- CRISPR knockout in HEK-293 artificially inflates toxicity profiles
+- Cancer selectivity vs HEK-293 evaluated in Layer 3B via AUCell
+
+## Deadlock Rules (Layer 3A)
+- **DL9**: Cell line match - L2B cell line must match primary CRISPR query (Jurkat)
+- **DL10**: Delta positive only - no absolute value
+- **DL11**: P(dep) threshold > 0.8 for essential label
+- **DL12**: Exclude HEK-293 from CRISPR query
+"""
 ## Stage 1: Imports & Configuration
 # ============================================================
 # Stage 1: Imports & Configuration
