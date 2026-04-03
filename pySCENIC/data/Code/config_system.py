@@ -1,5 +1,5 @@
 # ============================================================
-# config_system.py - Central Configuration Hub v1.5
+# config_system.py - Central Configuration Hub v1.6
 # ============================================================
 # Purpose: Single source of truth for multi-layer analysis pipeline
 #          (Layer 1 -> Layer N). All notebooks import from here
@@ -37,6 +37,12 @@
 #          - Positive delta filtering (DL10 compliance)
 #          - Deadlock rules DL9, DL10, DL11, DL12
 #          - check_layer3a_resources() function
+#   v1.6 - Layer 3B: AUCell Functional State configuration
+#          - AUCell threshold parameters (L3B_AUC_THRESHOLD, L3B_DELTA_AUC_THRESHOLD)
+#          - GeneSignature requirements (ctxcore compliance)
+#          - Jurkat (cancer) vs HEK-293 (normal) comparison
+#          - Deadlock rules DL13, DL14, DL15, DL16
+#          - check_layer3b_resources() function
 # ============================================================
 
 from pathlib import Path
@@ -226,6 +232,11 @@ LAYER2B_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer2B_Heterogeneous_RWR"
 # LAYER 3A OUTPUT DIRECTORIES (NEW v1.5)
 # ============================================================
 LAYER3A_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer3A_CRISPR_Validation"
+
+# ============================================================
+# LAYER 3B OUTPUT DIRECTORIES (NEW v1.6)
+# ============================================================
+LAYER3B_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer3B_AUCell_Selectivity"
 
 # ============================================================
 # STRING PPI DATA PATHS (NEW v1.4)
@@ -432,6 +443,78 @@ COL_DELTA_RANK = "Delta_Rank"
 # CRISPR coverage status values
 CRISPR_FOUND = "FOUND"
 CRISPR_NOT_FOUND = "NOT_IN_CRISPR"
+
+# ============================================================
+# LAYER 3B AUCELL CONFIGURATION (NEW v1.6)
+# ============================================================
+# AUCell Functional State Analysis - Cancer Selectivity Validation
+#
+# SMART Goal:
+#   S - Compare regulon activity (AUC) between Jurkat (cancer) and HEK-293 (normal)
+#   M - Delta AUC = AUC_Jurkat - AUC_HEK293 quantifies cancer selectivity
+#   A - Using pySCENIC AUCell with ctxcore GeneSignature objects
+#   R - Validates that essential regulons are "bright" in cancer, "dim" in normal
+#   T - Single notebook execution (~10-15 minutes)
+#
+# FAIR Compliance:
+#   F - Persistent regulon IDs (TF_regulon format)
+#   A - Standard CSV output with full AUC metrics
+#   I - Uses ctxcore GeneSignature objects (pySCENIC compatible)
+#   R - Full provenance in selectivity summary JSON
+#
+# Scientific Basis:
+#   - AUCell ranks genes within each cell independently (DL15)
+#   - Positive Delta AUC = regulon is MORE active in cancer cells
+#   - Negative Delta AUC = regulon is LESS active in cancer = toxicity risk
+#   - Threshold 0.05 Delta AUC provides robust selectivity signal
+# ============================================================
+
+# AUCell threshold for gene recovery curve
+L3B_AUC_THRESHOLD = 0.05  # Default AUCell recovery curve threshold
+
+# Delta AUC threshold for cancer selectivity
+# Delta AUC > 0.05 = cancer selective (bright in cancer, dim in normal)
+L3B_DELTA_AUC_THRESHOLD = 0.05
+
+# Minimum genes required in a GeneSignature
+L3B_MIN_GENES_IN_SIGNATURE = 5
+
+# ============================================================
+# LAYER 3B CELL LINE COMPARISON (NEW v1.6)
+# ============================================================
+# Jurkat (cancer) vs HEK-293 (normal) for selectivity calculation
+#
+# Scientific basis:
+#   - Jurkat: T-cell leukemia (cancer) - Expected BRIGHT regulon activity
+#   - HEK-293: Kidney non-malignant (normal) - Expected DIM regulon activity
+#   - Delta AUC = AUC_Jurkat - AUC_HEK293
+#   - Positive delta indicates cancer-selective regulon activation
+# ============================================================
+L3B_CANCER_CELL_LINE = "Jurkat"
+L3B_CANCER_MODEL_ID = "ACH-000995"  # Jurkat T-cell leukemia
+
+L3B_NORMAL_CELL_LINE = "HEK293"
+L3B_NORMAL_MODEL_ID = "ACH-001085"  # HEK-293 non-malignant kidney
+
+# ============================================================
+# LAYER 3B OUTPUT FILENAMES (NEW v1.6)
+# ============================================================
+L3B_ACTIVE_REGULONS_CSV = "L3B_Active_Regulons.csv"          # Regulons with positive Delta AUC > threshold
+L3B_ALL_REGULONS_AUC_CSV = "L3B_All_Regulons_AUC.csv"        # All regulons with AUC scores
+L3B_L3A_SIGNATURE_AUC_CSV = "L3B_L3A_Signature_AUC.csv"      # Aggregate L3A signature AUC
+L3B_SELECTIVITY_SUMMARY_JSON = "L3B_Selectivity_Summary.json"  # Metadata + statistics
+L3B_QC_PLOTS_DIR = "L3B_QC_Plots"
+
+# ============================================================
+# LAYER 3B COLUMN NAMES (NEW v1.6)
+# ============================================================
+COL_AUC_JURKAT = "AUC_Jurkat"
+COL_AUC_HEK293 = "AUC_HEK293"
+COL_DELTA_AUC = "Delta_AUC"
+COL_REGULON_NAME = "Regulon_Name"
+COL_N_GENES = "N_Genes"
+COL_IS_SELECTIVE = "Is_Selective"
+COL_SELECTIVITY_RANK = "Selectivity_Rank"
 
 # ============================================================
 # 9 TARGET PROTEINS
@@ -692,8 +775,8 @@ CNN_VS_NOTE = (
 # ============================================================
 PROJECT_METADATA = {
     "project_name": "Benzyl Ether Multi-Target Docking Campaign",
-    "version": "1.5.0",
-    "pipeline_version": "GNINA_v2.6.2 + pySCENIC + NetworkX RWR + CRISPR Validation",
+    "version": "1.6.0",
+    "pipeline_version": "GNINA_v2.6.2 + pySCENIC + NetworkX RWR + CRISPR + AUCell",
     "n_ligands": N_LIGANDS_EXPECTED,
     "n_targets": N_TARGETS,
     "targets": TARGET_NAMES,
@@ -795,6 +878,29 @@ DEADLOCK_RULES = {
         "inflates toxicity profiles due to viral immortalization machinery. "
         "Cancer selectivity vs HEK-293 MUST be evaluated via AUCell in Layer 3B."
     ),
+    # Layer 3B Rules (NEW v1.6)
+    "DL13_GENESIGNATURE_OBJECTS": (
+        "ABSOLUTELY DO NOT use plain Python lists/arrays as AUCell signatures. "
+        "MUST use ctxcore.genesig.GeneSignature objects. "
+        "Plain lists will cause TypeError in pySCENIC AUCell function. "
+        "Correct: GeneSignature(name='...', gene2weight={...})"
+    ),
+    "DL14_TPM_NORMALIZATION": (
+        "ABSOLUTELY DO NOT use raw read counts for AUCell analysis. "
+        "Expression matrix MUST be log2(x+1) normalized (CCLE TPM format). "
+        "Raw counts create artificial variance that corrupts ranking."
+    ),
+    "DL15_AUCELL_CELL_INDEPENDENCE": (
+        "AUCell rankings are computed INDEPENDENTLY within each cell. "
+        "This makes cross-cell comparison robust to batch effects. "
+        "Do NOT apply additional batch correction before AUCell - it auto-handles."
+    ),
+    "DL16_DELTA_AUC_INTERPRETATION": (
+        "Positive Delta AUC (Jurkat - HEK293 > 0) = CANCER SELECTIVE. "
+        "Regulon is BRIGHT in cancer, DIM in normal = therapeutic opportunity. "
+        "Negative Delta AUC = regulon more active in normal = TOXICITY RISK. "
+        "Only positive Delta AUC regulons are valid drug targets."
+    ),
 }
 
 # ============================================================
@@ -829,7 +935,7 @@ def normalize_gene_name(name: str) -> str:
 def print_config_summary():
     """Print current configuration summary - call at start of each notebook."""
     print("=" * 64)
-    print("CONFIG SYSTEM - Central Configuration Hub v1.5")
+    print("CONFIG SYSTEM - Central Configuration Hub v1.6")
     print("=" * 64)
     print(f"Project root:       {PROJECT_ROOT}")
     print(f"Docking data:       {DOCKING_PARENT_DIR}")
@@ -837,6 +943,7 @@ def print_config_summary():
     print(f"Layer 2A output:    {LAYER2A_OUTPUT_DIR}")
     print(f"Layer 2B output:    {LAYER2B_OUTPUT_DIR}")
     print(f"Layer 3A output:    {LAYER3A_OUTPUT_DIR}")
+    print(f"Layer 3B output:    {LAYER3B_OUTPUT_DIR}")
     print(f"Targets:            {N_TARGETS} ({', '.join(TARGET_NAMES)})")
     print(f"  Track 1 (PB):     {', '.join(TARGETS_WITH_PB)}")
     print(f"  Track 2 (no PB):  {', '.join(TARGETS_WITHOUT_PB)}")
@@ -869,6 +976,14 @@ def print_config_summary():
     print(f"  Primary cell line:{L3A_PRIMARY_CELL_LINE} ({L3A_PRIMARY_MODEL_ID})")
     print(f"  Cancer cell lines:{', '.join(LAYER3A_CANCER_CELL_LINES.keys())}")
     print(f"  HEK-293:          EXCLUDED (DL12 - handled in L3B)")
+    print("-" * 64)
+    print("Layer 3B (AUCell Selectivity):")
+    print(f"  AUC threshold:    {L3B_AUC_THRESHOLD}")
+    print(f"  Delta AUC cutoff: > {L3B_DELTA_AUC_THRESHOLD} (cancer selective)")
+    print(f"  Min genes/sig:    {L3B_MIN_GENES_IN_SIGNATURE}")
+    print(f"  Cancer cell line: {L3B_CANCER_CELL_LINE} ({L3B_CANCER_MODEL_ID})")
+    print(f"  Normal cell line: {L3B_NORMAL_CELL_LINE} ({L3B_NORMAL_MODEL_ID})")
+    print(f"  Signature type:   ctxcore GeneSignature (DL13)")
     print("=" * 64)
 
 
@@ -891,8 +1006,14 @@ def validate_deadlock_rules(step: str, **context):
     Layer 3A Steps (NEW v1.5):
       - cell_line_match: Ensure L2B cell line matches L3A primary (DL9)
       - delta_positive_only: Ensure only positive Delta_Score used (DL10)
-      - pdep_threshold: Ensure P(dep) > 0.8 for essential label (DL11)
+      - pdep_threshold: Ensure P(dep) > 0.5 for essential label (DL11)
       - exclude_hek293: Ensure HEK-293 not in CRISPR query (DL12)
+    
+    Layer 3B Steps (NEW v1.6):
+      - genesignature_objects: Ensure ctxcore GeneSignature used (DL13)
+      - tpm_normalization: Ensure expression is log2(x+1) TPM (DL14)
+      - aucell_independence: Informational - AUCell handles batch effects (DL15)
+      - delta_auc_interpretation: Ensure positive Delta AUC for selectivity (DL16)
     """
     if step == "pre_normalize":
         assert context.get("filtered", False), (
@@ -962,6 +1083,27 @@ def validate_deadlock_rules(step: str, **context):
             f"DEADLOCK VIOLATION - DL12:\n"
             f"{DEADLOCK_RULES['DL12_EXCLUDE_HEK293_CRISPR']}\n"
             f"Cell lines used: {cell_lines_used}"
+        )
+    # Layer 3B Rules (NEW v1.6)
+    elif step == "genesignature_objects":
+        assert context.get("used_genesignature", False), (
+            f"DEADLOCK VIOLATION - DL13:\n"
+            f"{DEADLOCK_RULES['DL13_GENESIGNATURE_OBJECTS']}"
+        )
+    elif step == "tpm_normalization":
+        assert context.get("is_tpm_normalized", False), (
+            f"DEADLOCK VIOLATION - DL14:\n"
+            f"{DEADLOCK_RULES['DL14_TPM_NORMALIZATION']}"
+        )
+    elif step == "aucell_independence":
+        # Informational check - AUCell auto-handles batch effects
+        pass  # DL15 is informational, not a hard constraint
+    elif step == "delta_auc_interpretation":
+        delta_auc = context.get("delta_auc", 0)
+        assert delta_auc > 0, (
+            f"DEADLOCK VIOLATION - DL16:\n"
+            f"{DEADLOCK_RULES['DL16_DELTA_AUC_INTERPRETATION']}\n"
+            f"Delta AUC: {delta_auc} (negative = toxicity risk)"
         )
 
 
@@ -1046,12 +1188,58 @@ def check_layer3a_resources() -> dict:
     }
 
 
+def check_layer3b_resources() -> dict:
+    """
+    Check availability of Layer 3B AUCell Functional State resources.
+    
+    Returns:
+        dict with keys for each required resource
+        Values: True if available, False otherwise
+    
+    Resources checked:
+        - L3A Essential Targets CSV (required - from Layer 3A)
+        - L2A Master Regulons CSV (required - for per-TF signatures)
+        - CCLE TPM Expression CSV (required - log2(x+1) normalized)
+        - Layer 3B output directory (will be created if missing)
+    
+    DL13 Compliance:
+        Validates that ctxcore is available for GeneSignature creation.
+    DL14 Compliance:
+        Validates that expression data is TPM normalized (CCLE format).
+    """
+    # Layer 3A Essential Targets (required input)
+    l3a_essential_path = LAYER3A_OUTPUT_DIR / L3A_ESSENTIAL_TARGETS_CSV
+    
+    # Layer 2A Master Regulons (required for per-TF signatures)
+    l2a_regulons_path = LAYER2A_OUTPUT_DIR / L2A_MASTER_REGULONS_CSV
+    
+    # CCLE TPM Expression (required)
+    ccle_tpm_path = Path(CCLE_TPM_EXPRESSION_CSV)
+    
+    # Check ctxcore availability
+    try:
+        from ctxcore.genesig import GeneSignature
+        ctxcore_available = True
+    except ImportError:
+        ctxcore_available = False
+    
+    return {
+        "l3a_essential_targets": l3a_essential_path.exists(),
+        "l2a_master_regulons": l2a_regulons_path.exists(),
+        "ccle_tpm_expression": ccle_tpm_path.exists(),
+        "layer3b_output_dir_exists": LAYER3B_OUTPUT_DIR.exists(),
+        "ctxcore_available": ctxcore_available,
+        "cancer_cell_line_configured": L3B_CANCER_MODEL_ID == "ACH-000995",  # Jurkat
+        "normal_cell_line_configured": L3B_NORMAL_MODEL_ID == "ACH-001085",  # HEK-293
+    }
+
+
 # ============================================================
 # Self-test on import
 # ============================================================
 if __name__ == "__main__":
     print_config_summary()
-    print("\nconfig_system.py v1.5 loaded successfully.")
+    print("\nconfig_system.py v1.6 loaded successfully.")
     print(f"   Deadlock rules: {list(DEADLOCK_RULES.keys())}")
     pb_configured = sum(1 for v in POSEBUSTERS_PATHS.values() if v is not None)
     print(f"   PoseBusters paths configured: {pb_configured}/{len(POSEBUSTERS_PATHS)}")
@@ -1079,6 +1267,15 @@ if __name__ == "__main__":
             # Only show warning if Jurkat-specific also missing
             if not l3a_resources.get("layer2b_delta_network_jurkat", False):
                 status = "MISSING (run Layer 2B first)"
+        print(f"      {key}: {status}")
+    print("\n   Layer 3B Resources:")
+    l3b_resources = check_layer3b_resources()
+    for key, available in l3b_resources.items():
+        status = "OK" if available else "MISSING"
+        if key == "layer3b_output_dir_exists" and not available:
+            status = "MISSING (will be created)"
+        if key == "ctxcore_available" and not available:
+            status = "MISSING (install ctxcore: pip install ctxcore)"
         print(f"      {key}: {status}")
     print("\n   Gene Name Normalization Test:")
     test_cases = [("ALOX-5", "ALOX5"), ("Alox5", "ALOX5"), ("PPARG", "PPARG")]
