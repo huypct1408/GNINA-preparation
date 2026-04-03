@@ -252,35 +252,30 @@ print("="*64)
 print(f"Loading CCLE TPM Expression from: {CCLE_TPM_EXPRESSION_CSV}")
 print("[DL14] Using pre-normalized log2(x+1) TPM data - NO additional transformation\n")
 
-# Load expression matrix - first inspect the structure
-exp_df_raw = pd.read_csv(CCLE_TPM_EXPRESSION_CSV, nrows=5)
-print(f"Total columns in file: {len(exp_df_raw.columns)}")
-print(f"First 5 columns: {list(exp_df_raw.columns[:5])}")
+# 1. TẢI FILE: KHÔNG dùng index_col=0 để tránh lấy nhầm cột
+exp_df = pd.read_csv(CCLE_TPM_EXPRESSION_CSV)
 
-# The CCLE TPM file structure may have:
-# - First column: ModelID (sample identifier like ACH-XXXXXX)
-# - Possible metadata columns before gene columns
-# - Gene columns: may be in format "GENE (EntrezID)" or just gene names
-
-# Load full matrix with first column as index
-exp_df = pd.read_csv(CCLE_TPM_EXPRESSION_CSV, index_col=0)
-print(f"\nExpression matrix loaded:")
+print(f"\nExpression matrix loaded (Raw):")
 print(f"  Shape: {exp_df.shape}")
-print(f"  Index name: {exp_df.index.name}")
-print(f"  Sample index values: {list(exp_df.index[:3])}")
 print(f"  First 5 column names: {list(exp_df.columns[:5])}")
 
-# Identify and remove non-gene metadata columns
-# Metadata columns are typically: SequencingID, CellLineName, etc. (non-numeric or identifiers)
+# 2. HOTFIX: ĐẶT MODELID LÀM INDEX TRƯỚC KHI LỌC METADATA
+if 'ModelID' in exp_df.columns:
+    exp_df = exp_df.set_index('ModelID')
+    print("\n[DL9] Successfully set 'ModelID' as the matrix index.")
+elif 'Unnamed: 0' in exp_df.columns:
+    # Nếu file không có header ModelID rõ ràng, cột thứ 2 thường là ModelID trong định dạng của DepMap
+    exp_df = exp_df.set_index(exp_df.columns[1])
+    print(f"\n[DL9] Fallback: Set '{exp_df.index.name}' as the matrix index.")
+
+# 3. LỌC BỎ METADATA (Chỉ giữ lại các cột chứa số - Gen)
 metadata_cols = []
 gene_cols = []
 
 for col in exp_df.columns:
-    # Check if column is numeric
     if exp_df[col].dtype in ['float64', 'float32', 'int64', 'int32']:
         gene_cols.append(col)
     else:
-        # Try to convert to numeric - if fails, it's metadata
         try:
             pd.to_numeric(exp_df[col], errors='raise')
             gene_cols.append(col)
@@ -299,8 +294,7 @@ if metadata_cols:
     exp_df = exp_df[gene_cols]
     print(f"New shape: {exp_df.shape}")
 
-# Clean gene names - strip Entrez IDs if present
-# Format: "GENE (12345)" -> "GENE"
+# 4. LÀM SẠCH TÊN GEN (Bỏ Entrez IDs)
 original_cols = exp_df.columns.tolist()
 clean_cols = [str(c).split(' (')[0] for c in original_cols]
 exp_df.columns = clean_cols
@@ -320,6 +314,7 @@ print(f"  Mean: {data_mean:.4f}")
 # DL14 validation
 validate_deadlock_rules("tpm_normalization", is_tpm_normalized=True)
 print("\n[DL14] TPM normalization check: PASSED")
+
 # ============================================================
 # STAGE 4B: Extract Jurkat and HEK-293 Samples
 # ============================================================
@@ -333,12 +328,8 @@ hek293_id = L3B_NORMAL_MODEL_ID   # ACH-001085
 print(f"Cancer cell line:  {L3B_CANCER_CELL_LINE} ({jurkat_id})")
 print(f"Normal cell line:  {L3B_NORMAL_CELL_LINE} ({hek293_id})")
 
-# Check index format - might be ModelID directly or need lookup
 available_samples = exp_df.index.tolist()
-print(f"\nSample index values (first 5): {available_samples[:5]}")
-print(f"Index dtype: {exp_df.index.dtype}")
 
-# Check if ModelIDs are in the index directly
 jurkat_found = jurkat_id in available_samples
 hek293_found = hek293_id in available_samples
 
@@ -346,44 +337,8 @@ print(f"\nDirect ModelID lookup:")
 print(f"  Jurkat ({jurkat_id}) in index: {jurkat_found}")
 print(f"  HEK-293 ({hek293_id}) in index: {hek293_found}")
 
-# If not found directly, try partial matching (sometimes index has additional info)
-if not jurkat_found:
-    jurkat_matches = [s for s in available_samples if jurkat_id in str(s)]
-    if jurkat_matches:
-        jurkat_id = jurkat_matches[0]
-        jurkat_found = True
-        print(f"  Jurkat found via partial match: {jurkat_id}")
-
-if not hek293_found:
-    hek293_matches = [s for s in available_samples if hek293_id in str(s)]
-    if hek293_matches:
-        hek293_id = hek293_matches[0]
-        hek293_found = True
-        print(f"  HEK-293 found via partial match: {hek293_id}")
-
-# If still not found, check if we need to load Model.csv for mapping
 if not jurkat_found or not hek293_found:
-    print("\n[WARNING] Cell lines not found by ModelID. Checking Model.csv for mapping...")
-    from config_system import CCLE_MODEL_CSV
-    
-    model_df = pd.read_csv(CCLE_MODEL_CSV)
-    print(f"Model.csv columns: {list(model_df.columns[:10])}")
-    
-    # Find rows for our cell lines
-    jurkat_row = model_df[model_df['ModelID'] == L3B_CANCER_MODEL_ID]
-    hek293_row = model_df[model_df['ModelID'] == L3B_NORMAL_MODEL_ID]
-    
-    if not jurkat_row.empty:
-        print(f"  Jurkat in Model.csv: {jurkat_row[['ModelID', 'CellLineName']].values}")
-    if not hek293_row.empty:
-        print(f"  HEK-293 in Model.csv: {hek293_row[['ModelID', 'CellLineName']].values}")
-    
-    # Try alternative index column names
-    print(f"\n  Expression index name: {exp_df.index.name}")
-    print(f"  Searching for alternative mapping...")
-
-if not jurkat_found or not hek293_found:
-    print("\n[ERROR] Required cell lines still not found!")
+    print("\n[ERROR] Required cell lines not found!")
     print(f"Available samples (first 20): {available_samples[:20]}")
     raise ValueError(f"Required cell lines not found in expression matrix!\n"
                      f"Jurkat ({L3B_CANCER_MODEL_ID}): {jurkat_found}\n"
