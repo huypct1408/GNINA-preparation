@@ -1,5 +1,5 @@
 # ============================================================
-# config_system.py - Central Configuration Hub v1.4
+# config_system.py - Central Configuration Hub v1.5
 # ============================================================
 # Purpose: Single source of truth for multi-layer analysis pipeline
 #          (Layer 1 -> Layer N). All notebooks import from here
@@ -30,6 +30,13 @@
 #          - Delta-Network analysis parameters
 #          - normalize_gene_name() utility function
 #          - Deadlock rules DL6, DL7, DL8
+#   v1.5 - Layer 3A: CRISPR Essentiality Validation configuration
+#          - CRISPR DepMap data path (CRISPRGeneDependency.csv)
+#          - 5 cancer cell lines (excluding HEK-293)
+#          - P(dep) threshold configuration
+#          - Positive delta filtering (DL10 compliance)
+#          - Deadlock rules DL9, DL10, DL11, DL12
+#          - check_layer3a_resources() function
 # ============================================================
 
 from pathlib import Path
@@ -216,6 +223,11 @@ L2A_QC_PLOTS_DIR = "L2A_QC_Plots"
 LAYER2B_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer2B_Heterogeneous_RWR"
 
 # ============================================================
+# LAYER 3A OUTPUT DIRECTORIES (NEW v1.5)
+# ============================================================
+LAYER3A_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer3A_CRISPR_Validation"
+
+# ============================================================
 # STRING PPI DATA PATHS (NEW v1.4)
 # ============================================================
 # STRING Database v12.0 - Human protein-protein interactions
@@ -260,7 +272,7 @@ RWR_TOL = 1e-6               # Convergence tolerance
 RWR_PSEUDO_COUNT = 0.001     # Epsilon for P0 calibration (prevents zero-division)
 
 # ============================================================
-# TARGET CELL LINE CONFIGURATION (NEW v1.4)
+# TARGET CELL LINE CONFIGURATION (NEW v1.4) (This is for layer 2B RWR analysis, different from the cell lines used for GRNBoost2 in layer 2A or layer 3A CRISPR validation)
 # ============================================================
 # MCF-7: Human breast adenocarcinoma cell line
 # Used for P0 calibration with tissue-specific expression
@@ -322,6 +334,104 @@ COL_GENE_NORMALIZED = "Gene_Normalized"
 # Edge type identifiers
 EDGE_TYPE_SCENIC = "SCENIC_GRN"    # TF -> Target (one-way)
 EDGE_TYPE_STRING = "STRING_PPI"    # Protein <-> Protein (bidirectional)
+
+# ============================================================
+# CRISPR DEPMAP DATA PATH (NEW v1.5)
+# ============================================================
+# DepMap CRISPR Gene Dependency - P(dependency) probability scores
+# Download from: https://depmap.org/portal/data_page/?tab=allData&releasename=DepMap%20Public%2025Q3
+#
+# Scientific basis:
+#   - P(dep) is probability that gene knockout reduces cell viability
+#   - Range 0.0 to 1.0 (0 = not essential, 1.0 = essential)
+#   - P(dep) > 0.8 indicates high-confidence essential gene
+#   - Matrix orientation: Rows=Samples (ModelID), Cols=Genes (Symbol + EntrezID)
+#
+# File format:
+#   - Column 1: ModelID (e.g., ACH-000001)
+#   - Columns 2-N: Gene names as "SYMBOL (EntrezID)" format
+#   - Values: P(dependency) probability scores
+# ============================================================
+CRISPR_GENE_DEPENDENCY_CSV = Path(r"d:\khoa_luan\protein\SCENIC\CRISPRGeneDependency.csv")
+
+# ============================================================
+# LAYER 3A CRISPR CONFIGURATION (NEW v1.5)
+# ============================================================
+# CRISPR Essentiality Validation parameters
+#
+# SMART Goal:
+#   S - Filter Top 50 positive delta genes against CRISPR P(dep)
+#   M - Retain genes with P(dep) > 0.8 in any cancer cell line
+#   A - Using existing CRISPRGeneDependency.csv (1,186 cell lines)
+#   R - Identifies genes whose knockout causes cancer cell death
+#   T - Single notebook execution (~5-10 minutes)
+#
+# FAIR Compliance:
+#   F - Persistent gene IDs (HGNC symbols)
+#   A - Standard CSV output format
+#   I - Uses normalized gene names (compatible with STRING/CCLE)
+#   R - Full provenance in validation summary JSON
+# ============================================================
+
+# P(dependency) threshold for essential genes
+CRISPR_PDEP_THRESHOLD = 0.5  # P(dep) > 0.5 indicates essential gene
+
+# Number of top positive delta genes to validate
+L3A_TOP_DELTA_GENES = 60  # The KDR (a Direct Target with a positive Delta) is at Rank 59 (Delta = 0.00013). If you set $k=50$, you will inadvertently cut off the direct target of action (KDR) that the Active drug group is aiming for. Choosing $k=60$ fully encompasses all significant direct targets.
+
+# CRITICAL: Only use positive delta (DL10 compliance)
+# Positive delta = genes elevated when ACTIVE drugs are present
+# This isolates "Mechanism of Killing" from Active compounds only
+L3A_DELTA_POSITIVE_ONLY = True
+
+# ============================================================
+# LAYER 3A CANCER CELL LINES (NEW v1.5)
+# ============================================================
+# 5 cancer cell lines for CRISPR validation
+# HEK-293 EXCLUDED from CRISPR query (DL12 compliance)
+# Selectivity against HEK-293 evaluated in Layer 3B via AUCell
+#
+# Scientific basis:
+#   - CRISPR knockout in immortalized lines (HEK-293) artificially
+#     inflates toxicity profiles
+#   - Cancer selectivity must be evaluated using transcriptomic
+#     comparison (AUCell), not CRISPR essentiality
+# ============================================================
+LAYER3A_CANCER_CELL_LINES = {
+    "MCF7": "ACH-000019",        # Breast - ER+
+    "MDAMB231": "ACH-000768",    # Breast - Triple negative (normalized name)
+    "A549": "ACH-000681",        # Lung - NSCLC
+    "Jurkat": "ACH-000995",      # Lymphoid - T-cell leukemia
+    "SW480": "ACH-000842",       # Bowel - Colorectal
+}
+# NOTE: HEK293 (ACH-001085) intentionally EXCLUDED - handled in Layer 3B
+
+# Primary cell line for validation (must match Layer 2B RWR analysis)
+L3A_PRIMARY_CELL_LINE = "Jurkat"
+L3A_PRIMARY_MODEL_ID = "ACH-000995"
+
+# ============================================================
+# LAYER 3A OUTPUT FILENAMES (NEW v1.5)
+# ============================================================
+L3A_ESSENTIAL_TARGETS_CSV = "L3A_Essential_Targets.csv"
+L3A_ALL_CANDIDATES_CSV = "L3A_All_Candidates.csv"
+L3A_VALIDATION_SUMMARY_JSON = "L3A_Validation_Summary.json"
+L3A_QC_PLOTS_DIR = "L3A_QC_Plots"
+
+# ============================================================
+# LAYER 3A COLUMN NAMES (NEW v1.5)
+# ============================================================
+COL_P_DEP = "P_dep"
+COL_P_DEP_PREFIX = "P_dep_"  # Column prefix for cell line-specific P(dep)
+COL_MAX_P_DEP = "Max_P_dep"
+COL_ESSENTIAL_IN_N_LINES = "Essential_In_N_Lines"
+COL_IS_ESSENTIAL = "Is_Essential"
+COL_CRISPR_COVERAGE = "CRISPR_Coverage"
+COL_DELTA_RANK = "Delta_Rank"
+
+# CRISPR coverage status values
+CRISPR_FOUND = "FOUND"
+CRISPR_NOT_FOUND = "NOT_IN_CRISPR"
 
 # ============================================================
 # 9 TARGET PROTEINS
@@ -582,8 +692,8 @@ CNN_VS_NOTE = (
 # ============================================================
 PROJECT_METADATA = {
     "project_name": "Benzyl Ether Multi-Target Docking Campaign",
-    "version": "1.4.0",
-    "pipeline_version": "GNINA_v2.6.2 + pySCENIC + NetworkX RWR",
+    "version": "1.5.0",
+    "pipeline_version": "GNINA_v2.6.2 + pySCENIC + NetworkX RWR + CRISPR Validation",
     "n_ligands": N_LIGANDS_EXPECTED,
     "n_targets": N_TARGETS,
     "targets": TARGET_NAMES,
@@ -591,6 +701,7 @@ PROJECT_METADATA = {
     "grn_engine": "pySCENIC (GRNBoost2 + cisTarget)",
     "rwr_engine": "NetworkX PageRank (RWR with alpha=0.7)",
     "ppi_database": "STRING v12.0 (physical.links, score >= 700)",
+    "crispr_database": "DepMap CRISPR Gene Dependency (P(dep) scores)",
     "scoring_functions": [
         "minimizedAffinity (Vina forcefield)",
         "CNNscore (pose probability)",
@@ -660,6 +771,30 @@ DEADLOCK_RULES = {
         "Delta_Score = RWR_Active - RWR_Inactive. "
         "If graphs don't diverge, discard hypothesis (Against Confirmation Bias)."
     ),
+    # Layer 3A Rules (NEW v1.5)
+    "DL9_CELL_LINE_MATCH": (
+        "ABSOLUTELY DO NOT mix cell line contexts between layers. "
+        "Layer 2B RWR cell line MUST match Layer 3A primary CRISPR query. "
+        "Example: Jurkat RWR analysis -> Jurkat P(dep) as primary validation. "
+        "Cross-cell-line validation is secondary/supplementary only."
+    ),
+    "DL10_DELTA_POSITIVE_ONLY": (
+        "ABSOLUTELY DO NOT use absolute value of Delta_Score for L3A input. "
+        "MUST filter Delta_Score > 0 (positive only) to isolate Mechanism of Killing. "
+        "Negative delta genes = pathways elevated in INACTIVE (failing) drugs. "
+        "Including negative delta contaminates essential gene list with non-MoA genes."
+    ),
+    "DL11_PDEP_THRESHOLD": (
+        "ABSOLUTELY DO NOT claim gene is 'essential' with P(dep) <= 0.5. "
+        "P(dep) > 0.5 is the Broad Institute's official threshold for CRISPR essentiality. (https://forum.depmap.org/t/dependency-threshold/498/2)"
+        "Report all candidates but only label P(dep) > 0.5 as Is_Essential=True."
+    ),
+    "DL12_EXCLUDE_HEK293_CRISPR": (
+        "ABSOLUTELY DO NOT include HEK-293 in Layer 3A CRISPR essentiality query. "
+        "HEK-293 is immortalized non-cancer line - CRISPR knockout artificially "
+        "inflates toxicity profiles due to viral immortalization machinery. "
+        "Cancer selectivity vs HEK-293 MUST be evaluated via AUCell in Layer 3B."
+    ),
 }
 
 # ============================================================
@@ -694,13 +829,14 @@ def normalize_gene_name(name: str) -> str:
 def print_config_summary():
     """Print current configuration summary - call at start of each notebook."""
     print("=" * 64)
-    print("CONFIG SYSTEM - Central Configuration Hub v1.4")
+    print("CONFIG SYSTEM - Central Configuration Hub v1.5")
     print("=" * 64)
     print(f"Project root:       {PROJECT_ROOT}")
     print(f"Docking data:       {DOCKING_PARENT_DIR}")
     print(f"Layer 1 output:     {LAYER1_OUTPUT_DIR}")
     print(f"Layer 2A output:    {LAYER2A_OUTPUT_DIR}")
     print(f"Layer 2B output:    {LAYER2B_OUTPUT_DIR}")
+    print(f"Layer 3A output:    {LAYER3A_OUTPUT_DIR}")
     print(f"Targets:            {N_TARGETS} ({', '.join(TARGET_NAMES)})")
     print(f"  Track 1 (PB):     {', '.join(TARGETS_WITH_PB)}")
     print(f"  Track 2 (no PB):  {', '.join(TARGETS_WITHOUT_PB)}")
@@ -724,6 +860,15 @@ def print_config_summary():
     print(f"  Target cell line: {TARGET_CELL_LINE} ({TARGET_CELL_LINE_MODEL_ID})")
     print(f"  Active/Inactive:  Top {100-ACTIVE_PERCENTILE}% / Bottom {INACTIVE_PERCENTILE}%")
     print(f"  Top hub genes:    {L2B_TOP_HUB_GENES}")
+    print("-" * 64)
+    print("Layer 3A (CRISPR Essentiality):")
+    print(f"  CRISPR data:      {CRISPR_GENE_DEPENDENCY_CSV}")
+    print(f"  P(dep) threshold: > {CRISPR_PDEP_THRESHOLD}")
+    print(f"  Top delta genes:  {L3A_TOP_DELTA_GENES}")
+    print(f"  Delta filter:     Positive only (DL10)")
+    print(f"  Primary cell line:{L3A_PRIMARY_CELL_LINE} ({L3A_PRIMARY_MODEL_ID})")
+    print(f"  Cancer cell lines:{', '.join(LAYER3A_CANCER_CELL_LINES.keys())}")
+    print(f"  HEK-293:          EXCLUDED (DL12 - handled in L3B)")
     print("=" * 64)
 
 
@@ -742,6 +887,12 @@ def validate_deadlock_rules(step: str, **context):
       - directed_grn: Ensure SCENIC edges are directed (DL6)
       - p0_calibration: Ensure P0 = CNN_VS * Expression (DL7)
       - delta_network: Ensure Active vs Inactive comparison (DL8)
+    
+    Layer 3A Steps (NEW v1.5):
+      - cell_line_match: Ensure L2B cell line matches L3A primary (DL9)
+      - delta_positive_only: Ensure only positive Delta_Score used (DL10)
+      - pdep_threshold: Ensure P(dep) > 0.8 for essential label (DL11)
+      - exclude_hek293: Ensure HEK-293 not in CRISPR query (DL12)
     """
     if step == "pre_normalize":
         assert context.get("filtered", False), (
@@ -783,6 +934,34 @@ def validate_deadlock_rules(step: str, **context):
         assert context.get("compared_active_inactive", False), (
             f"DEADLOCK VIOLATION - DL8:\n"
             f"{DEADLOCK_RULES['DL8_DELTA_NETWORK']}"
+        )
+    # Layer 3A Rules (NEW v1.5)
+    elif step == "cell_line_match":
+        l2b_cell_line = context.get("l2b_cell_line", "")
+        l3a_primary = context.get("l3a_primary_cell_line", L3A_PRIMARY_CELL_LINE)
+        assert l2b_cell_line == l3a_primary, (
+            f"DEADLOCK VIOLATION - DL9:\n"
+            f"{DEADLOCK_RULES['DL9_CELL_LINE_MATCH']}\n"
+            f"L2B cell line: {l2b_cell_line}, L3A primary: {l3a_primary}"
+        )
+    elif step == "delta_positive_only":
+        assert context.get("used_positive_only", False), (
+            f"DEADLOCK VIOLATION - DL10:\n"
+            f"{DEADLOCK_RULES['DL10_DELTA_POSITIVE_ONLY']}"
+        )
+    elif step == "pdep_threshold":
+        threshold = context.get("threshold", 0)
+        assert threshold >= CRISPR_PDEP_THRESHOLD, (
+            f"DEADLOCK VIOLATION - DL11:\n"
+            f"{DEADLOCK_RULES['DL11_PDEP_THRESHOLD']}\n"
+            f"Used threshold: {threshold}, Required: > {CRISPR_PDEP_THRESHOLD}"
+        )
+    elif step == "exclude_hek293":
+        cell_lines_used = context.get("cell_lines", [])
+        assert "HEK293" not in cell_lines_used and "HEK-293" not in cell_lines_used, (
+            f"DEADLOCK VIOLATION - DL12:\n"
+            f"{DEADLOCK_RULES['DL12_EXCLUDE_HEK293_CRISPR']}\n"
+            f"Cell lines used: {cell_lines_used}"
         )
 
 
@@ -835,12 +1014,44 @@ def check_layer2b_resources() -> dict:
     }
 
 
+def check_layer3a_resources() -> dict:
+    """
+    Check availability of Layer 3A CRISPR Essentiality resources.
+    
+    Returns:
+        dict with keys for each required resource
+        Values: True if available, False otherwise
+    
+    Resources checked:
+        - CRISPR Gene Dependency CSV (required)
+        - Layer 2B Delta Network Summary (required)
+        - Layer 3A output directory (will be created if missing)
+    
+    DL9 Compliance:
+        Also validates that L2B was run with matching cell line.
+    """
+    # Layer 2B Delta Network path (required input)
+    # Note: Check for Jurkat-specific output directory
+    l2b_delta_path = PROJECT_ROOT / "outputs" / "Layer2B_Heterogeneous_RWR_Jurkat" / L2B_DELTA_NETWORK_CSV
+    
+    # Alternative: check generic L2B output if Jurkat-specific doesn't exist
+    l2b_generic_path = LAYER2B_OUTPUT_DIR / L2B_DELTA_NETWORK_CSV
+    
+    return {
+        "crispr_gene_dependency": CRISPR_GENE_DEPENDENCY_CSV.exists(),
+        "layer2b_delta_network_jurkat": l2b_delta_path.exists(),
+        "layer2b_delta_network_generic": l2b_generic_path.exists(),
+        "layer3a_output_dir_exists": LAYER3A_OUTPUT_DIR.exists(),
+        "primary_cell_line_match": L3A_PRIMARY_CELL_LINE in LAYER3A_CANCER_CELL_LINES,
+    }
+
+
 # ============================================================
 # Self-test on import
 # ============================================================
 if __name__ == "__main__":
     print_config_summary()
-    print("\nconfig_system.py v1.4 loaded successfully.")
+    print("\nconfig_system.py v1.5 loaded successfully.")
     print(f"   Deadlock rules: {list(DEADLOCK_RULES.keys())}")
     pb_configured = sum(1 for v in POSEBUSTERS_PATHS.values() if v is not None)
     print(f"   PoseBusters paths configured: {pb_configured}/{len(POSEBUSTERS_PATHS)}")
@@ -857,6 +1068,17 @@ if __name__ == "__main__":
         status = "OK" if available else "MISSING"
         if key == "layer2a_scenic_grn" and not available:
             status = "MISSING (will use STRING-only graph)"
+        print(f"      {key}: {status}")
+    print("\n   Layer 3A Resources:")
+    l3a_resources = check_layer3a_resources()
+    for key, available in l3a_resources.items():
+        status = "OK" if available else "MISSING"
+        if key == "layer3a_output_dir_exists" and not available:
+            status = "MISSING (will be created)"
+        if key == "layer2b_delta_network_generic" and not available:
+            # Only show warning if Jurkat-specific also missing
+            if not l3a_resources.get("layer2b_delta_network_jurkat", False):
+                status = "MISSING (run Layer 2B first)"
         print(f"      {key}: {status}")
     print("\n   Gene Name Normalization Test:")
     test_cases = [("ALOX-5", "ALOX5"), ("Alox5", "ALOX5"), ("PPARG", "PPARG")]
