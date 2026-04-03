@@ -42,7 +42,7 @@ Layer 1 (Thermodynamic Gate) → Layer 2A (SCENIC GRN) → Layer 2B (RWR)
 """
 ## Stage 1: Imports & Configuration
 
-Load all required libraries and import config_system v1.6.
+# Load all required libraries and import config_system v1.6.
 # ============================================================
 # STAGE 1: Imports & Configuration
 # ============================================================
@@ -144,7 +144,7 @@ else:
     print("\n[OK] All Layer 3B resources available")
 ## Stage 2: Load Layer 3A Essential Targets
 
-Load CRISPR-validated essential genes from Layer 3A output.
+# Load CRISPR-validated essential genes from Layer 3A output.
 # ============================================================
 # STAGE 2: Load Layer 3A Essential Targets
 # ============================================================
@@ -182,7 +182,7 @@ print(f"  Total essential genes: {len(L3A_ESSENTIAL_GENES)}")
 print("="*64)
 ## Stage 3: Load L2A Regulons
 
-Load TF→Target edges from Layer 2A Master Regulons. Group by TF to create per-regulon signatures.
+# Load TF→Target edges from Layer 2A Master Regulons. Group by TF to create per-regulon signatures.
 # ============================================================
 # STAGE 3: Load L2A Regulons
 # ============================================================
@@ -241,9 +241,9 @@ print(f"  Unique regulons (TFs): {len(regulon_stats_df)}")
 print("="*64)
 ## Stage 4: Load Expression Data (CCLE TPM)
 
-Load the pre-normalized CCLE TPM matrix and extract Jurkat + HEK-293 samples.
+# Load the pre-normalized CCLE TPM matrix and extract Jurkat + HEK-293 samples.
 
-**DL14 Compliance**: CCLE TPM is already log2(x+1) normalized - NO additional transformation needed.
+# **DL14 Compliance**: CCLE TPM is already log2(x+1) normalized - NO additional transformation needed.
 # ============================================================
 # STAGE 4: Load Expression Data (CCLE TPM)
 # ============================================================
@@ -321,12 +321,13 @@ print(f"  Total genes: {exp_subset.shape[1]}")
 print(f"  Cell lines: Jurkat (cancer), HEK-293 (normal)")
 print("="*64)
 ## Stage 5: Create GeneSignature Objects
-
+"""
 **CRITICAL (DL13)**: MUST use `ctxcore.genesig.GeneSignature` objects - plain lists will cause TypeError!
 
 ### Two Approaches:
 1. **Aggregate L3A Signature**: Single signature from all L3A essential genes
 2. **Per-TF Regulon Signatures**: Individual signatures for each TF's target genes
+"""
 # ============================================================
 # STAGE 5A: Create Aggregate L3A Signature
 # ============================================================
@@ -439,9 +440,9 @@ print(f"  [DL13] All signatures use ctxcore.genesig.GeneSignature")
 print("="*64)
 ## Stage 6: Run AUCell Analysis
 
-Execute AUCell to calculate regulon activity scores (AUC) for each cell line.
+# Execute AUCell to calculate regulon activity scores (AUC) for each cell line.
 
-**DL15**: AUCell rankings are computed independently within each cell - automatically robust to batch effects.
+# **DL15**: AUCell rankings are computed independently within each cell - automatically robust to batch effects.
 # ============================================================
 # STAGE 6: Run AUCell Analysis
 # ============================================================
@@ -503,12 +504,13 @@ print(f"  Jurkat mean AUC: {auc_jurkat.mean():.4f}")
 print(f"  HEK-293 mean AUC: {auc_hek293.mean():.4f}")
 print("="*64)
 ## Stage 7: Calculate Delta AUC (Cancer Selectivity)
-
+"""
 **Delta AUC = AUC_Jurkat - AUC_HEK293**
 
 **DL16 Interpretation**:
 - **Positive Delta AUC**: Regulon is MORE active in cancer (Jurkat) than normal (HEK-293) = **CANCER SELECTIVE**
 - **Negative Delta AUC**: Regulon is LESS active in cancer = **TOXICITY RISK**
+"""
 # ============================================================
 # STAGE 7: Calculate Delta AUC (Cancer Selectivity)
 # ============================================================
@@ -603,7 +605,7 @@ print(f"  Negative Delta: {n_negative_delta}")
 print("="*64)
 ## Stage 8: Statistical Validation & Visualization
 
-Generate QC plots and validate results.
+#Generate QC plots and validate results.
 # ============================================================
 # STAGE 8A: Delta AUC Distribution Plot
 # ============================================================
@@ -700,7 +702,7 @@ print(f"  QC plots saved to: {qc_plots_dir}")
 print("="*64)
 ## Stage 9: Export Results & Pipeline Summary
 
-Save all output files and generate metadata summary.
+# Save all output files and generate metadata summary.
 # ============================================================
 # STAGE 9A: Export Active Regulons CSV
 # ============================================================
