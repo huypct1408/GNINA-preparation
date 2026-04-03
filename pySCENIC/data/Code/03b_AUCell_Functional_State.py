@@ -1,8 +1,8 @@
 # Layer 3B: AUCell Functional State Analysis
-"""
+
 ## Cancer Selectivity Validation via Regulon Activity Comparison
 
----
+'''
 
 ### SMART Goal
 - **S**pecific: Compare regulon activity (AUC) between Jurkat (T-cell leukemia) and HEK-293 (normal kidney)
@@ -22,24 +22,25 @@
 - **DL14**: Expression matrix must be log2(x+1) normalized (CCLE TPM format)
 - **DL15**: AUCell rankings are cell-independent - batch effects auto-handled
 - **DL16**: Positive Delta AUC = cancer selective; Negative = toxicity risk
-
+'''
 ### Pipeline Position
-```
+'''
 Layer 1 (Thermodynamic Gate) → Layer 2A (SCENIC GRN) → Layer 2B (RWR) 
     → Layer 3A (CRISPR) → [Layer 3B: AUCell Selectivity] → Layer 4...
-```
+'''
 
 ### Input Files
-1. `L3A_Essential_Targets.csv` - CRISPR-validated essential genes (from Layer 3A)
-2. `L2A_Master_Regulons_AllLineages.csv` - TF→Target edges with weights (from Layer 2A)
-3. `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` - CCLE TPM expression matrix
+# 1. `L3A_Essential_Targets.csv` - CRISPR-validated essential genes (from Layer 3A)
+# 2. `L2A_Master_Regulons_AllLineages.csv` - TF→Target edges with weights (from Layer 2A)
+# 3. `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` - CCLE TPM expression matrix
 
 ### Output Files
-1. `L3B_Active_Regulons.csv` - Regulons with positive Delta AUC > threshold
-2. `L3B_All_Regulons_AUC.csv` - All regulons with AUC scores for both cell lines
-3. `L3B_L3A_Signature_AUC.csv` - Aggregate L3A signature AUC
-4. `L3B_Selectivity_Summary.json` - Metadata + statistics
-"""
+# 1. `L3B_Active_Regulons.csv` - Regulons with positive Delta AUC > threshold
+# 2. `L3B_All_Regulons_AUC.csv` - All regulons with AUC scores for both cell lines
+# 3. `L3B_L3A_Signature_AUC.csv` - Aggregate L3A signature AUC
+# 4. `L3B_Selectivity_Summary.json` - Metadata + statistics
+
+
 ## Stage 1: Imports & Configuration
 
 # Load all required libraries and import config_system v1.6.
@@ -251,16 +252,57 @@ print("="*64)
 print(f"Loading CCLE TPM Expression from: {CCLE_TPM_EXPRESSION_CSV}")
 print("[DL14] Using pre-normalized log2(x+1) TPM data - NO additional transformation\n")
 
-# Load expression matrix
+# Load expression matrix - first inspect the structure
+exp_df_raw = pd.read_csv(CCLE_TPM_EXPRESSION_CSV, nrows=5)
+print(f"Total columns in file: {len(exp_df_raw.columns)}")
+print(f"First 5 columns: {list(exp_df_raw.columns[:5])}")
+
+# The CCLE TPM file structure may have:
+# - First column: ModelID (sample identifier like ACH-XXXXXX)
+# - Possible metadata columns before gene columns
+# - Gene columns: may be in format "GENE (EntrezID)" or just gene names
+
+# Load full matrix with first column as index
 exp_df = pd.read_csv(CCLE_TPM_EXPRESSION_CSV, index_col=0)
-print(f"Expression matrix shape: {exp_df.shape}")
-print(f"  Rows (samples/cells): {exp_df.shape[0]}")
-print(f"  Columns (genes): {exp_df.shape[1]}")
+print(f"\nExpression matrix loaded:")
+print(f"  Shape: {exp_df.shape}")
+print(f"  Index name: {exp_df.index.name}")
+print(f"  Sample index values: {list(exp_df.index[:3])}")
+print(f"  First 5 column names: {list(exp_df.columns[:5])}")
+
+# Identify and remove non-gene metadata columns
+# Metadata columns are typically: SequencingID, CellLineName, etc. (non-numeric or identifiers)
+metadata_cols = []
+gene_cols = []
+
+for col in exp_df.columns:
+    # Check if column is numeric
+    if exp_df[col].dtype in ['float64', 'float32', 'int64', 'int32']:
+        gene_cols.append(col)
+    else:
+        # Try to convert to numeric - if fails, it's metadata
+        try:
+            pd.to_numeric(exp_df[col], errors='raise')
+            gene_cols.append(col)
+        except (ValueError, TypeError):
+            metadata_cols.append(col)
+
+print(f"\nColumn analysis:")
+print(f"  Metadata columns (non-numeric): {len(metadata_cols)}")
+if metadata_cols:
+    print(f"    Examples: {metadata_cols[:5]}")
+print(f"  Gene columns (numeric): {len(gene_cols)}")
+
+# Keep only gene columns
+if metadata_cols:
+    print(f"\nDropping {len(metadata_cols)} metadata columns...")
+    exp_df = exp_df[gene_cols]
+    print(f"New shape: {exp_df.shape}")
 
 # Clean gene names - strip Entrez IDs if present
 # Format: "GENE (12345)" -> "GENE"
 original_cols = exp_df.columns.tolist()
-clean_cols = [c.split(' (')[0] for c in original_cols]
+clean_cols = [str(c).split(' (')[0] for c in original_cols]
 exp_df.columns = clean_cols
 print(f"\n[DL5] Stripped Entrez IDs from gene names")
 print(f"  Sample original: {original_cols[0]}")
@@ -291,18 +333,61 @@ hek293_id = L3B_NORMAL_MODEL_ID   # ACH-001085
 print(f"Cancer cell line:  {L3B_CANCER_CELL_LINE} ({jurkat_id})")
 print(f"Normal cell line:  {L3B_NORMAL_CELL_LINE} ({hek293_id})")
 
-# Check if both cell lines exist in the matrix
+# Check index format - might be ModelID directly or need lookup
 available_samples = exp_df.index.tolist()
+print(f"\nSample index values (first 5): {available_samples[:5]}")
+print(f"Index dtype: {exp_df.index.dtype}")
 
+# Check if ModelIDs are in the index directly
 jurkat_found = jurkat_id in available_samples
 hek293_found = hek293_id in available_samples
 
-print(f"\nJurkat ({jurkat_id}) in matrix: {jurkat_found}")
-print(f"HEK-293 ({hek293_id}) in matrix: {hek293_found}")
+print(f"\nDirect ModelID lookup:")
+print(f"  Jurkat ({jurkat_id}) in index: {jurkat_found}")
+print(f"  HEK-293 ({hek293_id}) in index: {hek293_found}")
+
+# If not found directly, try partial matching (sometimes index has additional info)
+if not jurkat_found:
+    jurkat_matches = [s for s in available_samples if jurkat_id in str(s)]
+    if jurkat_matches:
+        jurkat_id = jurkat_matches[0]
+        jurkat_found = True
+        print(f"  Jurkat found via partial match: {jurkat_id}")
+
+if not hek293_found:
+    hek293_matches = [s for s in available_samples if hek293_id in str(s)]
+    if hek293_matches:
+        hek293_id = hek293_matches[0]
+        hek293_found = True
+        print(f"  HEK-293 found via partial match: {hek293_id}")
+
+# If still not found, check if we need to load Model.csv for mapping
+if not jurkat_found or not hek293_found:
+    print("\n[WARNING] Cell lines not found by ModelID. Checking Model.csv for mapping...")
+    from config_system import CCLE_MODEL_CSV
+    
+    model_df = pd.read_csv(CCLE_MODEL_CSV)
+    print(f"Model.csv columns: {list(model_df.columns[:10])}")
+    
+    # Find rows for our cell lines
+    jurkat_row = model_df[model_df['ModelID'] == L3B_CANCER_MODEL_ID]
+    hek293_row = model_df[model_df['ModelID'] == L3B_NORMAL_MODEL_ID]
+    
+    if not jurkat_row.empty:
+        print(f"  Jurkat in Model.csv: {jurkat_row[['ModelID', 'CellLineName']].values}")
+    if not hek293_row.empty:
+        print(f"  HEK-293 in Model.csv: {hek293_row[['ModelID', 'CellLineName']].values}")
+    
+    # Try alternative index column names
+    print(f"\n  Expression index name: {exp_df.index.name}")
+    print(f"  Searching for alternative mapping...")
 
 if not jurkat_found or not hek293_found:
+    print("\n[ERROR] Required cell lines still not found!")
+    print(f"Available samples (first 20): {available_samples[:20]}")
     raise ValueError(f"Required cell lines not found in expression matrix!\n"
-                     f"Jurkat: {jurkat_found}, HEK-293: {hek293_found}")
+                     f"Jurkat ({L3B_CANCER_MODEL_ID}): {jurkat_found}\n"
+                     f"HEK-293 ({L3B_NORMAL_MODEL_ID}): {hek293_found}")
 
 # Extract subset
 cell_lines = [jurkat_id, hek293_id]
@@ -321,13 +406,12 @@ print(f"  Total genes: {exp_subset.shape[1]}")
 print(f"  Cell lines: Jurkat (cancer), HEK-293 (normal)")
 print("="*64)
 ## Stage 5: Create GeneSignature Objects
-"""
-**CRITICAL (DL13)**: MUST use `ctxcore.genesig.GeneSignature` objects - plain lists will cause TypeError!
+
+# **CRITICAL (DL13)**: MUST use `ctxcore.genesig.GeneSignature` objects - plain lists will cause TypeError!
 
 ### Two Approaches:
-1. **Aggregate L3A Signature**: Single signature from all L3A essential genes
-2. **Per-TF Regulon Signatures**: Individual signatures for each TF's target genes
-"""
+# 1. **Aggregate L3A Signature**: Single signature from all L3A essential genes
+# 2. **Per-TF Regulon Signatures**: Individual signatures for each TF's target genes
 # ============================================================
 # STAGE 5A: Create Aggregate L3A Signature
 # ============================================================
@@ -504,13 +588,12 @@ print(f"  Jurkat mean AUC: {auc_jurkat.mean():.4f}")
 print(f"  HEK-293 mean AUC: {auc_hek293.mean():.4f}")
 print("="*64)
 ## Stage 7: Calculate Delta AUC (Cancer Selectivity)
-"""
-**Delta AUC = AUC_Jurkat - AUC_HEK293**
 
-**DL16 Interpretation**:
-- **Positive Delta AUC**: Regulon is MORE active in cancer (Jurkat) than normal (HEK-293) = **CANCER SELECTIVE**
-- **Negative Delta AUC**: Regulon is LESS active in cancer = **TOXICITY RISK**
-"""
+# **Delta AUC = AUC_Jurkat - AUC_HEK293**
+
+# **DL16 Interpretation**:
+# - **Positive Delta AUC**: Regulon is MORE active in cancer (Jurkat) than normal (HEK-293) = **CANCER SELECTIVE**
+# - **Negative Delta AUC**: Regulon is LESS active in cancer = **TOXICITY RISK**
 # ============================================================
 # STAGE 7: Calculate Delta AUC (Cancer Selectivity)
 # ============================================================
@@ -605,7 +688,7 @@ print(f"  Negative Delta: {n_negative_delta}")
 print("="*64)
 ## Stage 8: Statistical Validation & Visualization
 
-#Generate QC plots and validate results.
+# Generate QC plots and validate results.
 # ============================================================
 # STAGE 8A: Delta AUC Distribution Plot
 # ============================================================
