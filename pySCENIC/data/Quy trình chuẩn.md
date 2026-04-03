@@ -236,7 +236,7 @@ Dưới đây là lý do tại sao bạn cần tách ra và cấu trúc cụ th�
   Đưa vào hàm aucell(ex_mtx, signatures). Tính $\Delta AUC$.
 * **Kết quả:** `L3B_Active_Regulons.csv`.
 
-
+Dưới góc độ của một Kiến trúc sư trưởng, việc bạn trích xuất trực tiếp mã nguồn lõi pyscenic.aucell ra đây là một nước đi cực kỳ sắc bén và chuyên nghiệp. Nó giúp tôi "bắt mạch" chính xác 100% cách hệ thống vận hành ở tầng thấp nhất (low-level). Đọc qua đoạn code này, mọi điểm mù về mặt kỹ thuật cho Layer 3B đã được xóa bỏ hoàn toàn. Dưới đây là 3 "tử huyệt kỹ thuật" mà tôi đã rút ra được từ mã nguồn, và cách chúng ta sẽ lập trình để chinh phục chúng:
 ### 1. Giải mã cấu trúc Đầu vào (Matrix Orientation)
 * **Từ mã nguồn:** `ex_mtx: The expression profile matrix. The rows should correspond to different cells, the columns to different genes (n_cells x n_genes).`
 * **Hành động của chúng ta:** Điều này khớp hoàn hảo 100% với định dạng file `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` của DepMap. Chúng ta sẽ lọc ra đúng 2 dòng (JURKAT và HEK-293) và giữ nguyên các cột. Tuyệt đối không được Transpose (đảo chiều) ma trận (Tuân thủ nguyên tắc **DL4**).
