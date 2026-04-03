@@ -220,42 +220,43 @@ Dưới đây là lý do tại sao bạn cần tách ra và cấu trúc cụ th�
 
 #### Layer 3A: CRISPR Essentiality (Cái chết vật lý)
 * **Mục tiêu:** Xác định Hub Gene nào khi bị "đánh sập" (Knock-out) sẽ làm tế bào ung thư chết ngay lập tức.
-* **Logic lọc:** 1.  Load `L2B_Top50_Hub_Genes.csv`.
-    2.  Query `CRISPRGeneDependency.csv` để lấy chỉ số $P(dep)$ cho các gen này trên đúng dòng tế bào mục tiêu (ví dụ MCF-7).
+* **Logic lọc:** 1.  Load Load L2B_Delta_Network_Summary.csv (lọc lấy Top 50 Delta Score). 
+    2.  Query `CRISPRGeneDependency.csv` để lấy chỉ số $P(dep)$ cho các gen này trên đúng dòng tế bào mục tiêu (ví dụ Jurkat, ACH-000995).
     3.  Giữ lại các gen có **$P(dep) > 0.8$**.
 * **Kết quả:** `L3A_Essential_Targets.csv` (Đây là danh sách các "tử huyệt" thực sự).
 
 #### Layer 3B: AUCell Functional State (Cái chết chức năng)
 * **Mục tiêu:** Chứng minh các Regulons của bạn đang "rực sáng" ở tế bào ung thư và "tắt lịm" ở mô bình thường.
 * **Logic lọc:**
-    1.  Nạp ma trận TPM của Ung thư (DepMap) + Tham chiếu (HEK-293) + **Mô bình thường (GTEx)**.
-    2.  Chạy `aucell` để tính AUC cho các Regulons từ Layer 2A.
-    3.  Tính $\Delta AUC = AUC_{cancer} - AUC_{normal}$.
-    4.  Giữ lại các Regulons có **$\Delta AUC > 0.05$**.
+  Dùng `ctxcore` gói các gen sống sót ở 3A thành 1 GeneSignature.
+
+  Load file TPM của DepMap, cắt lấy 2 dòng: 1 dòng tế bào mục tiêu (ví dụ như JURKAT) và HEK-293 ((Thận phôi thai - Phi ác tính) mà bạn đã chọn từ đầu. DepMap có sẵn TPM của HEK-293 (ModelID: ACH-001085). Hãy dùng nó làm Baseline Normal để tính $\Delta AUC$. Nó cùng chung một file OmicsExpressionTPM...csv, giúp bạn tiết kiệm hàng chục giờ xử lý dữ liệu).
+  Đây là "cú đấm thép". Ở Layer 2A, file `L2A_Master_Regulons_AllLineages.csv` của bạn đã chứa sẵn cột NES và Motif, cấu trúc này sinh ra là để chạy AUCell! Bạn đã nạp thành công TPM của JURKAT vào Layer 2B. Bây giờ, việc nạp thêm TPM của HEK-293 (đã có sẵn trong bộ DepMap CCLE) để trừ đi ($\Delta AUC$) là một bài toán Python căn bản nhưng mang lại giá trị sinh học vô giá: Chứng minh tính chọn lọc.
+
+  Đưa vào hàm aucell(ex_mtx, signatures). Tính $\Delta AUC$.
 * **Kết quả:** `L3B_Active_Regulons.csv`.
 
+
+### 1. Giải mã cấu trúc Đầu vào (Matrix Orientation)
+* **Từ mã nguồn:** `ex_mtx: The expression profile matrix. The rows should correspond to different cells, the columns to different genes (n_cells x n_genes).`
+* **Hành động của chúng ta:** Điều này khớp hoàn hảo 100% với định dạng file `OmicsExpressionTPMLogp1HumanProteinCodingGenes.csv` của DepMap. Chúng ta sẽ lọc ra đúng 2 dòng (JURKAT và HEK-293) và giữ nguyên các cột. Tuyệt đối không được Transpose (đảo chiều) ma trận (Tuân thủ nguyên tắc **DL4**).
+
+### 2. Sự miễn nhiễm với Batch Effect (Intra-cell Ranking)
+* **Từ mã nguồn:** Hàm `create_rankings` sử dụng lệnh `ex_mtx.rank(axis=1, ascending=False...)`. 
+* **Hành động của chúng ta:** Đoạn code này chứng minh AUCell xếp hạng biểu hiện gen **độc lập bên trong từng tế bào**. Thuật toán không quan tâm TPM của JURKAT to hay nhỏ hơn HEK-293. Nó chỉ quan tâm: *"Trong nội bộ tế bào JURKAT, cụm gen mục tiêu đứng ở top mấy? Và trong nội bộ HEK-293, cụm gen đó đứng ở top mấy?"*. Điều này khiến cho phép trừ $\Delta AUC = AUC_{Jurkat} - AUC_{HEK293}$ trở nên vững chắc tuyệt đối về mặt Thống kê Sinh học.
+
+### 3. "Trùm cuối" của Layer 3B: Đối tượng `GeneSignature`
+* **Từ mã nguồn:** Hàm `aucell` yêu cầu tham số `signatures: Sequence[Type[GeneSignature]]`.
+* **Hành động của chúng ta:** Đây là cái bẫy lớn nhất! Chúng ta KHÔNG THỂ nhét một mảng string đơn thuần kiểu `["ALOX5", "ALOX5AP", "PTGES3"]` vào hàm này được, nó sẽ báo lỗi `TypeError` ngay lập tức.
+* **Cách giải quyết:** Trong code Layer 3, trước khi gọi hàm `aucell`, tôi sẽ phải dùng thư viện `ctxcore` để khởi tạo (instantiate) danh sách các Hub Genes sống sót từ Layer 3A thành các đối tượng `GeneSignature` hoặc `Regulon`.
+
 ---
 
-### 3. Sơ đồ luồng dữ liệu (Data Flow) Layer 3
+3. **[Tầng 3C - Ngữ nghĩa]:** Đọc file `NON_REDUNDANT_PATHWAYS.csv`. Tìm xem các "Siêu Gen" (vượt qua cả 3A và 3B) đang nằm trong Pathway nào. In ra kết quả Cơ chế (MoA) cuối cùng.
+Sẽ thật đáng tiếc nếu 115 Pathways (NON_REDUNDANT_PATHWAYS.csv) của bạn bị vứt xó sau khi đã cất công lọc qua Machine Learning (ElasticNet).
 
+Bằng cách đặt nó ở Layer 3C (Semantic Mapping), bạn không dùng nó để "chứng minh" (tránh được bẫy vòng vo), mà bạn dùng nó để "Gọi tên".
 
+Khi hội đồng hỏi: "Vậy tóm lại, sau khi qua CRISPR và AUCell, cơ chế của thuốc là gì?", bạn không thể ném cho họ một danh sách 5 gen. Bạn nạp 5 gen đó vào Bước 3C, hệ thống sẽ trả về tên REACTOME_Arachidonic_Acid_Metabolism. Bạn có một câu chuyện MoA hoàn chỉnh và cực kỳ học thuật!
 
-Sự hội tụ của 3A và 3B tại một điểm duy nhất chính là **"Hạt nhân của cơ chế tác động"**:
-* Nếu một gen vừa nằm trong 3A (Essential), vừa là TF của một Regulon trong 3B (Active) -> Bạn đã tìm thấy **Master Regulator**. Đánh trúng điểm này, mạng lưới sẽ sụp đổ theo hiệu ứng Domino.
-
----
-
-### 🚨 TUÂN THỦ "TÌNH HUỐNG TỬ HUYỆT" (DEADLOCK RULES V1.3)
-
-Để Layer 3 này vượt qua được các vòng phản biện khắt khe, bạn phải cài đặt 2 "chốt chặn" sau vào code:
-
-1.  **Chốt chặn Naming (Rule 7):** Trong Script 3B, tuyệt đối không tạo biến nào tên là `healthy_control` cho dữ liệu HEK-293. Hãy đặt tên biến là `non_malignant_ref_HEK293`. Đối với dữ liệu GTEx, hãy đặt là `normal_tissue_GTEx`. Điều này thể hiện sự am hiểu về bản chất tế bào học (HEK-293 là tế bào biến đổi, không phải tế bào khỏe mạnh bình thường).
-2.  **Chốt chặn Adaptive Failure (Rule 8):** Đừng cố gắng tìm dữ liệu RNA-seq sau 72h dùng thuốc để chứng minh gen đó thiết yếu. Hãy lập luận ngay trong notebook: *"Vì chỉ số $P(dep) > 0.8$ tại trạng thái baseline (t=0), bất kỳ sự can thiệp nào vào Hub Gene này cũng dẫn đến Adaptive Failure, không cho phép tế bào kịp thích nghi."*
-
-### 🟢 LỜI KHUYÊN HÀNH ĐỘNG:
-
-Hãy tạo hai file:
-1.  `03a_CRISPR_Essentiality_Filter.ipynb`
-2.  `03b_AUCell_Functional_Validation.ipynb`
-
-Bạn có muốn tôi phác thảo cấu trúc code (Stages) cho file **3A (CRISPR)** trước không? Phần này sẽ cần bạn chuẩn bị tệp `CRISPRGeneDependency.csv` từ cổng DepMap.
+Bạn đã sẵn sàng để tôi viết toàn bộ mã nguồn Python hoàn chỉnh cho cuốn Notebook Layer 3 này chưa?
