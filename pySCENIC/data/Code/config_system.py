@@ -26,7 +26,7 @@
 #          - STRING PPI data paths
 #          - RWR parameters (alpha, pseudo_count)
 #          - Target cell line configuration (MCF-7)
-#          - Active/Inactive percentile thresholds
+#          - High-Affinity/Low-Affinity percentile thresholds
 #          - Delta-Network analysis parameters
 #          - normalize_gene_name() utility function
 #          - Deadlock rules DL6, DL7, DL8
@@ -307,18 +307,28 @@ CELL_LINE_MODELS = {
 }
 
 # ============================================================
-# ACTIVE/INACTIVE THRESHOLD FOR DELTA-NETWORK (NEW v1.4)
+# HIGH-AFFINITY/LOW-AFFINITY THRESHOLD FOR DELTA-NETWORK (NEW v1.4)
 # ============================================================
-# Definition of "Active" vs "Inactive" compounds for comparative analysis
+# Definition of "High-Affinity" vs "Low-Affinity" compounds for comparative analysis
+#
+# IMPORTANT TERMINOLOGY NOTE (v1.6.1):
+#   CNN_VS is a PREDICTED binding score, NOT experimental biological activity.
+#   We use "High-Affinity" / "Low-Affinity" instead of "Active" / "Inactive"
+#   to avoid implying experimental validation (IC50/EC50) which does not exist.
 #
 # Scientific basis:
-#   - Active = Top 10% by CNN_VS (highest predicted binding affinity)
-#   - Inactive = Bottom 10% by CNN_VS (weakest predicted binding)
-#   - Delta = RWR_Active - RWR_Inactive eliminates housekeeping hubs
+#   - High-Affinity = Top 10% by CNN_VS (highest predicted binding affinity)
+#   - Low-Affinity = Bottom 10% by CNN_VS (weakest predicted binding)
+#   - Delta = RWR_HighAffinity - RWR_LowAffinity eliminates housekeeping hubs
 #   - Only drug-specific hubs survive delta filtering
+#
+# Cut-off justification (HTS hit rate ~1-10%):
+#   - 5% (N~9): Too small, high variance from outliers
+#   - 10% (N~18): Sweet spot - statistically meaningful, elite binders only
+#   - 20% (N~36): Dilutes signal with mediocre binders
 # ============================================================
-ACTIVE_PERCENTILE = 90       # Top 10% (100 - 90 = 10%)
-INACTIVE_PERCENTILE = 10     # Bottom 10%
+ACTIVE_PERCENTILE = 90       # High-Affinity: Top 10% by CNN_VS (100 - 90 = 10%)
+INACTIVE_PERCENTILE = 10     # Low-Affinity: Bottom 10% by CNN_VS
 
 # ============================================================
 # LAYER 2B OUTPUT FILENAMES (NEW v1.4)
@@ -850,9 +860,10 @@ DEADLOCK_RULES = {
     ),
     "DL8_DELTA_NETWORK": (
         "ABSOLUTELY DO NOT conclude MoA from single compound analysis. "
-        "MUST run Delta-Network comparison: Active vs Inactive substances. "
-        "Delta_Score = RWR_Active - RWR_Inactive. "
-        "If graphs don't diverge, discard hypothesis (Against Confirmation Bias)."
+        "MUST run Delta-Network comparison: High-Affinity vs Low-Affinity compounds. "
+        "Delta_Score = RWR_HighAffinity - RWR_LowAffinity. "
+        "If graphs don't diverge, discard hypothesis (Against Confirmation Bias). "
+        "NOTE: 'High/Low-Affinity' refers to PREDICTED binding (CNN_VS), not experimental activity."
     ),
     # Layer 3A Rules (NEW v1.5)
     "DL9_CELL_LINE_MATCH": (
@@ -965,7 +976,7 @@ def print_config_summary():
     print(f"  STRING threshold: {STRING_MIN_CONFIDENCE} (high confidence)")
     print(f"  RWR alpha:        {RWR_ALPHA} (restart probability)")
     print(f"  Target cell line: {TARGET_CELL_LINE} ({TARGET_CELL_LINE_MODEL_ID})")
-    print(f"  Active/Inactive:  Top {100-ACTIVE_PERCENTILE}% / Bottom {INACTIVE_PERCENTILE}%")
+    print(f"  High/Low-Affinity: Top {100-ACTIVE_PERCENTILE}% / Bottom {INACTIVE_PERCENTILE}% (by CNN_VS)")
     print(f"  Top hub genes:    {L2B_TOP_HUB_GENES}")
     print("-" * 64)
     print("Layer 3A (CRISPR Essentiality):")
@@ -1000,8 +1011,8 @@ def validate_deadlock_rules(step: str, **context):
     
     Layer 2B Steps:
       - directed_grn: Ensure SCENIC edges are directed (DL6)
-      - p0_calibration: Ensure P0 = CNN_VS * Expression (DL7)
-      - delta_network: Ensure Active vs Inactive comparison (DL8)
+      - p0_calibration: Ensure P0 = P0_raw_weight * Expression (DL7)
+      - delta_network: Ensure High-Affinity vs Low-Affinity comparison (DL8)
     
     Layer 3A Steps (NEW v1.5):
       - cell_line_match: Ensure L2B cell line matches L3A primary (DL9)
