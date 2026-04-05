@@ -398,13 +398,16 @@ CRISPR_GENE_DEPENDENCY_CSV = Path(r"/home/labhhc5/Documents/workspace/D21/Duong 
 CRISPR_PDEP_THRESHOLD = 0.5  # P(dep) > 0.5 indicates essential gene
 
 # Number of top positive delta genes to validate
-L3A_TOP_DELTA_GENES = 20  
+L3A_TOP_DELTA_GENES = 20  # Con so 20 nay la danh cho case A549; neu phan tich tren dong te bao khac, thi can phai chay mau layer3A voi con so bat ki de he thong phan tich danh gia sensitivity roi tu do chon ra con so phu hop
 '''
 "Phân tích độ nhạy (Sensitivity Analysis) o layer 3A chỉ ra rằng: 
 Ngay tại ngưỡng Top 20, mạng lưới đã bao phủ trọn vẹn toàn bộ các đích tác dụng vật lý (4 Direct Targets). 
 Đồng thời, mốc Top 20 mang lại tỷ lệ Tín hiệu/Nhiễu tốt nhất, với tỷ lệ nhiễu chỉ ở mức 75% (so với >85% ở các mốc mở rộng). 
 Việc nới rộng ngưỡng cắt ra Top 40 hay Top 60 không mang lại thêm bất kỳ mỏ neo nào mới, mà chỉ làm pha loãng mạng lưới bởi các gen không thiết yếu. 
-Do đó, Top 20 là ngưỡng cắt bảo thủ (conservative) và tối ưu nhất."
+Do đó, Top 20 là ngưỡng cắt bảo thủ (conservative) và tối ưu nhất cho truong hop cua A549"
+"Hệ thống của chúng tôi không sử dụng một ngưỡng cắt cố định (fixed threshold) cho toàn bộ các dòng tế bào, vì điều này vi phạm nguyên lý dị đồng tính (heterogeneity) của mạng lưới phiên mã ung thư. 
+Thay vào đó, chúng tôi tích hợp module Phân tích Độ nhạy (Sensitivity Analysis) để tự động hóa việc dò tìm 'Điểm gập' (Elbow point) tối ưu theo hướng dẫn của dữ liệu (data-driven) cho từng môi trường sinh lý cụ thể. 
+Điều này đảm bảo việc trích xuất Cơ chế Tác động (MoA) luôn đạt tỷ lệ Tín hiệu/Nhiễu (Signal-to-Noise) cao nhất, bất kể hệ gen của tế bào đích có cấu trúc như thế nào."
 '''
 
 # CRITICAL: Only use positive delta (DL10 compliance)
