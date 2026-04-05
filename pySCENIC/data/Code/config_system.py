@@ -293,8 +293,8 @@ RWR_PSEUDO_COUNT = 0.001     # Epsilon for P0 calibration (prevents zero-divisio
 #   - Well-characterized transcriptome in CCLE/DepMap
 #   - Representative of Breast lineage from Layer 2A
 # ============================================================
-TARGET_CELL_LINE = "MCF7" # Jurkat -> HEK-293 -> A549 -> SW480 -> MCF-7 và MDA-MB-231 (multi-lineage analysis)
-TARGET_CELL_LINE_MODEL_ID = "ACH-000019"
+TARGET_CELL_LINE = "A549" # Jurkat -> HEK-293 -> A549 -> SW480 -> MCF-7 và MDA-MB-231 (multi-lineage analysis)
+TARGET_CELL_LINE_MODEL_ID = "ACH-000681"
 
 # Alternative cell lines for multi-lineage analysis
 CELL_LINE_MODELS = {
@@ -373,7 +373,7 @@ EDGE_TYPE_STRING = "STRING_PPI"    # Protein <-> Protein (bidirectional)
 #   - Columns 2-N: Gene names as "SYMBOL (EntrezID)" format
 #   - Values: P(dependency) probability scores
 # ============================================================
-CRISPR_GENE_DEPENDENCY_CSV = Path(r"d:\khoa_luan\protein\SCENIC\CRISPRGeneDependency.csv")
+CRISPR_GENE_DEPENDENCY_CSV = Path(r"/home/labhhc5/Documents/workspace/D21/Duong Huy/pyscenic/pyscenic_data/CRISPRGeneDependency.csv")
 
 # ============================================================
 # LAYER 3A CRISPR CONFIGURATION (NEW v1.5)
@@ -382,7 +382,7 @@ CRISPR_GENE_DEPENDENCY_CSV = Path(r"d:\khoa_luan\protein\SCENIC\CRISPRGeneDepend
 #
 # SMART Goal:
 #   S - Filter Top 50 positive delta genes against CRISPR P(dep)
-#   M - Retain genes with P(dep) > 0.8 in any cancer cell line
+#   M - Retain genes with P(dep) > 0.5 in any cancer cell line
 #   A - Using existing CRISPRGeneDependency.csv (1,186 cell lines)
 #   R - Identifies genes whose knockout causes cancer cell death
 #   T - Single notebook execution (~5-10 minutes)
@@ -398,7 +398,14 @@ CRISPR_GENE_DEPENDENCY_CSV = Path(r"d:\khoa_luan\protein\SCENIC\CRISPRGeneDepend
 CRISPR_PDEP_THRESHOLD = 0.5  # P(dep) > 0.5 indicates essential gene
 
 # Number of top positive delta genes to validate
-L3A_TOP_DELTA_GENES = 60  # The KDR (a Direct Target with a positive Delta) is at Rank 59 (Delta = 0.00013). If you set $k=50$, you will inadvertently cut off the direct target of action (KDR) that the Active drug group is aiming for. Choosing $k=60$ fully encompasses all significant direct targets.
+L3A_TOP_DELTA_GENES = 20  
+'''
+"Phân tích độ nhạy (Sensitivity Analysis) o layer 3A chỉ ra rằng: 
+Ngay tại ngưỡng Top 20, mạng lưới đã bao phủ trọn vẹn toàn bộ các đích tác dụng vật lý (4 Direct Targets). 
+Đồng thời, mốc Top 20 mang lại tỷ lệ Tín hiệu/Nhiễu tốt nhất, với tỷ lệ nhiễu chỉ ở mức 75% (so với >85% ở các mốc mở rộng). 
+Việc nới rộng ngưỡng cắt ra Top 40 hay Top 60 không mang lại thêm bất kỳ mỏ neo nào mới, mà chỉ làm pha loãng mạng lưới bởi các gen không thiết yếu. 
+Do đó, Top 20 là ngưỡng cắt bảo thủ (conservative) và tối ưu nhất."
+'''
 
 # CRITICAL: Only use positive delta (DL10 compliance)
 # Positive delta = genes elevated when ACTIVE drugs are present
@@ -428,8 +435,8 @@ LAYER3A_CANCER_CELL_LINES = {
 # NOTE: HEK293 (ACH-001085) intentionally EXCLUDED - handled in Layer 3B
 
 # Primary cell line for validation (must match Layer 2B RWR analysis)
-L3A_PRIMARY_CELL_LINE = "Jurkat"
-L3A_PRIMARY_MODEL_ID = "ACH-000995"
+L3A_PRIMARY_CELL_LINE = "A549"
+L3A_PRIMARY_MODEL_ID = "ACH-000681"
 
 # ============================================================
 # LAYER 3A OUTPUT FILENAMES (NEW v1.5)
@@ -500,8 +507,8 @@ L3B_MIN_GENES_IN_SIGNATURE = 5
 #   - Delta AUC = AUC_Jurkat - AUC_HEK293
 #   - Positive delta indicates cancer-selective regulon activation
 # ============================================================
-L3B_CANCER_CELL_LINE = "Jurkat"
-L3B_CANCER_MODEL_ID = "ACH-000995"  # Jurkat T-cell leukemia
+L3B_CANCER_CELL_LINE = "A549"
+L3B_CANCER_MODEL_ID = "ACH-000681"  # Jurkat T-cell leukemia or other cancer cells
 
 L3B_NORMAL_CELL_LINE = "HEK293"
 L3B_NORMAL_MODEL_ID = "ACH-001085"  # HEK-293 non-malignant kidney
@@ -518,7 +525,7 @@ L3B_QC_PLOTS_DIR = "L3B_QC_Plots"
 # ============================================================
 # LAYER 3B COLUMN NAMES (NEW v1.6)
 # ============================================================
-COL_AUC_JURKAT = "AUC_Jurkat"
+COL_AUC_JURKAT = "AUC_A549" # "AUC_Jurkat"
 COL_AUC_HEK293 = "AUC_HEK293"
 COL_DELTA_AUC = "Delta_AUC"
 COL_REGULON_NAME = "Regulon_Name"
