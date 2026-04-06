@@ -347,6 +347,19 @@ if not cancer_found or not hek293_found:
 # Extract subset
 cell_lines = [cancer_id, hek293_id]
 exp_subset = exp_df.loc[cell_lines].copy()
+# ============================================================
+# SCIENTIFIC RESOLUTION: AGGREGATE REPLICATES (NON-ARBITRARY)
+# ============================================================
+# Enforce Data Contract: Triệt tiêu nhiễu kỹ thuật bằng Mean Aggregation
+if isinstance(exp_subset, pd.DataFrame) and exp_subset.index.duplicated().any():
+    n_dupes = exp_subset.index.duplicated().sum()
+    print(f"\n[DATA INTEGRITY] Phát hiện {n_dupes} bản ghi trùng lặp (Technical Replicates).")
+    print(f"Thực thi Hợp nhất Dữ liệu (Mean Aggregation) để triệt tiêu nhiễu kỹ thuật...")
+    
+    # Gom nhóm theo tên index (ModelID) và tính trung bình cộng
+    exp_subset = exp_subset.groupby(exp_subset.index).mean()
+    print(f"[DATA INTEGRITY] Đã gộp Replicates thành công.")
+# ============================================================
 
 print(f"\nExtracted expression subset:")
 print(f"  Shape: {exp_subset.shape}")
