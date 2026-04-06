@@ -231,7 +231,7 @@ LAYER2B_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer2B_Heterogeneous_RWR"
 # ============================================================
 # LAYER 3A OUTPUT DIRECTORIES (NEW v1.5)
 # ============================================================
-LAYER3A_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer3A_CRISPR_Validation"
+LAYER3A_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "Layer3A_CRISPR_Validation_Jurkat_test_sensitivity"
 
 # ============================================================
 # LAYER 3B OUTPUT DIRECTORIES (NEW v1.6)
@@ -293,8 +293,8 @@ RWR_PSEUDO_COUNT = 0.001     # Epsilon for P0 calibration (prevents zero-divisio
 #   - Well-characterized transcriptome in CCLE/DepMap
 #   - Representative of Breast lineage from Layer 2A
 # ============================================================
-TARGET_CELL_LINE = "A549" # Jurkat -> HEK-293 -> A549 -> SW480 -> MCF-7 và MDA-MB-231 (multi-lineage analysis)
-TARGET_CELL_LINE_MODEL_ID = "ACH-000681"
+TARGET_CELL_LINE = "Jurkat" # Jurkat -> HEK-293 -> A549 -> SW480 -> MCF-7 và MDA-MB-231 (multi-lineage analysis)
+TARGET_CELL_LINE_MODEL_ID = "ACH-000995"
 
 # Alternative cell lines for multi-lineage analysis
 CELL_LINE_MODELS = {
@@ -398,7 +398,7 @@ CRISPR_GENE_DEPENDENCY_CSV = Path(r"/home/labhhc5/Documents/workspace/D21/Duong 
 CRISPR_PDEP_THRESHOLD = 0.5  # P(dep) > 0.5 indicates essential gene
 
 # Number of top positive delta genes to validate
-L3A_TOP_DELTA_GENES = 20  # Con so 20 nay la danh cho case A549; neu phan tich tren dong te bao khac, thi can phai chay mau layer3A voi con so bat ki de he thong phan tich danh gia sensitivity roi tu do chon ra con so phu hop
+L3A_TOP_DELTA_GENES = 60  # Con so 20 nay la danh cho case A549; neu phan tich tren dong te bao khac, thi can phai chay mau layer3A voi con so bat ki de he thong phan tich danh gia sensitivity roi tu do chon ra con so phu hop
 '''
 "Phân tích độ nhạy (Sensitivity Analysis) o layer 3A chỉ ra rằng: 
 Ngay tại ngưỡng Top 20, mạng lưới đã bao phủ trọn vẹn toàn bộ các đích tác dụng vật lý (4 Direct Targets). 
@@ -438,8 +438,8 @@ LAYER3A_CANCER_CELL_LINES = {
 # NOTE: HEK293 (ACH-001085) intentionally EXCLUDED - handled in Layer 3B
 
 # Primary cell line for validation (must match Layer 2B RWR analysis)
-L3A_PRIMARY_CELL_LINE = "A549"
-L3A_PRIMARY_MODEL_ID = "ACH-000681"
+L3A_PRIMARY_CELL_LINE = "Jurkat"
+L3A_PRIMARY_MODEL_ID = "ACH-000995"
 
 # ============================================================
 # LAYER 3A OUTPUT FILENAMES (NEW v1.5)
@@ -451,7 +451,8 @@ L3A_QC_PLOTS_DIR = "L3A_QC_Plots"
 
 # ============================================================
 # LAYER 3A COLUMN NAMES (NEW v1.5)
-# ============================================================
+# =============================================
+# ===============
 COL_P_DEP = "P_dep"
 COL_P_DEP_PREFIX = "P_dep_"  # Column prefix for cell line-specific P(dep)
 COL_MAX_P_DEP = "Max_P_dep"
@@ -510,8 +511,8 @@ L3B_MIN_GENES_IN_SIGNATURE = 5
 #   - Delta AUC = AUC_Jurkat - AUC_HEK293
 #   - Positive delta indicates cancer-selective regulon activation
 # ============================================================
-L3B_CANCER_CELL_LINE = "A549"
-L3B_CANCER_MODEL_ID = "ACH-000681"  # Jurkat T-cell leukemia or other cancer cells
+L3B_CANCER_CELL_LINE = "Jurkat"
+L3B_CANCER_MODEL_ID = "ACH-000995"  # Jurkat T-cell leukemia or other cancer cells
 
 L3B_NORMAL_CELL_LINE = "HEK293"
 L3B_NORMAL_MODEL_ID = "ACH-001085"  # HEK-293 non-malignant kidney
@@ -528,7 +529,7 @@ L3B_QC_PLOTS_DIR = "L3B_QC_Plots"
 # ============================================================
 # LAYER 3B COLUMN NAMES (NEW v1.6)
 # ============================================================
-COL_AUC_JURKAT = "AUC_A549" # "AUC_Jurkat"
+COL_AUC_CANCER = f"AUC_{L3B_CANCER_CELL_LINE}" #Co thay bang AUC_JURKAT khong, bo f di
 COL_AUC_HEK293 = "AUC_HEK293"
 COL_DELTA_AUC = "Delta_AUC"
 COL_REGULON_NAME = "Regulon_Name"
