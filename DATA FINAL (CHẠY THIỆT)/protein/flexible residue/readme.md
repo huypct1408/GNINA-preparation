@@ -1,45 +1,83 @@
 Folder này lựa chọn các flexible residue cho các protein
 
-# 1. PPARG (9F7W, Structural Studies on the Binding Mode of Bisphenols to PPARγ) `--flexres A:259,A:262,A:263,A:272,A:283.`
+# 1. PPARG (8ATY, Crystal structure of PPAR gamma (PPARG) in complex with JP85 (compound 1), Targeting the Alternative Vitamin E Metabolite Binding Site Enables Noncanonical PPAR gamma Modulation.) `# Core 5 (luôn dùng)
+--flexres A:288,A:289,A:449,A:473,A:259
 
-### Layer 3 — Full Technical Detail
+# Nếu dock vào alternative site (thêm R280)
+--flexres A:288,A:289,A:449,A:473,A:259,A:280`
 
-**1. Spatial Proximity Thresholds**
-[cite_start]The manuscript identifies two BPA binding sites, but explicitly states that the secondary site (BPA2) is supported by crystal contacts and its low binding energy indicates it is "not physiologically relevant"[cite: 1955, 1956, 1957]. Therefore, all proximity residues exclusive to BPA2 are discarded. [cite_start]We restrict our spatial threshold entirely to the physiologically relevant BPA1 molecule bound in the $\Omega$ sub-pocket, which is lined by the $\Omega$-loop (residues I262-V277), E259, Q283, and the $\beta$-sheet region (I341)[cite: 1463, 1464, 1469, 1635].
+## Flexible Residues cho 8ATY — Phân tích theo SOP
 
-**2. Apo/Holo Conformational Variance**
-We filter the primary pocket for polar residues that exhibit empirical evidence of conformational shifting upon ligand entry. 
-* [cite_start]**E259 and Q283**: The crystallographic comparison explicitly notes that "differences are also observed for residues E259 and Q283" when compared to the ligand-free apo structure[cite: 1468, 1469]. [cite_start]Furthermore, molecular dynamics (MD) simulations confirm high kinetic variance, as the ligand exhibits dynamic flexibility resulting from a "switch between three different hydrogen bonding interactions with the side chains of E272, Q283 and E259"[cite: 1633]. 
-* **Action**: **E259, E272, and Q283 MUST be designated as flexible** to allow the Monte Carlo algorithm to accurately simulate this shifting polar network.
+---
 
-**3. Resolution of Steric Clashes for Bulky Substituents**
-The entry of a bulky bisphenol into the $\Omega$ sub-pocket is sterically gated. The literature provides definitive proof of physical adaptation for one specific residue:
-* [cite_start]**I262**: The text documents that "in comparison to the ligand-free structure, I262 has moved out of the ligand binding pocket, ensuring significant space for the bound BPA"[cite: 1468]. 
-* **Action**: **I262 MUST be designated as flexible**. It acts as the primary spatial gateway. Freezing I262 will generate artificial Pauli repulsion forces (steric clashes) that will automatically reject any novel, bulky compounds attempting to penetrate the $\Omega$ sub-pocket.
+### TIER 1: Literature-Extracted (Trực tiếp từ bài báo JACS 2023)
 
-**4. Intrinsic Plasticity via Crystallographic B-Factors**
-[cite_start]The structural analysis highlights the $\Omega$-loop as an area of high intrinsic plasticity, noting it is "flexible and usually not resolved in PPAR$\gamma$ crystal structures"[cite: 1465]. 
-* [cite_start]**K263**: This residue forms a hydrogen bond with the ligand, but the crystallographic data reveals that "the $C_\delta$, $C_\epsilon$ and N atoms of this side chain have weak density indicating flexibility"[cite: 1532, 1533]. 
-* **Action**: **K263 MUST be designated as flexible**. The weak electron density provides physical justification for releasing its torsional degrees of freedom.
+#### Orthosteric Site
 
-**5. The Thermodynamic Exclusion Principle (Strictly Rigid Anchors)**
-[cite_start]Because BPA fails to interact with Y473 to stabilize the canonical AF-2 conformation[cite: 1951], the thermodynamic stability of the binding pose relies entirely on an alternative anchor.
-* [cite_start]**The $\beta$-sheet Anchor (I341, S342, M348)**: The manuscript establishes that partial agonism is attributed to interactions with the $\beta$-sheet region, specifically I341, S342, and M348[cite: 1972]. [cite_start]Crucially, free energy analyses of the MD simulations prove that "interaction with I341 has a large contribution to all three BPA and BPB binding modes"[cite: 1973].
-* **Action**: **I341, S342, and M348 MUST remain strictly rigid**. Introducing torsional flexibility to this $\beta$-sheet anchor violates the exclusion principle. Destabilizing I341 will destroy the primary hydrophobic anchoring interaction required to properly position the ligand, causing the simulated binding pose to collapse.
+| Residue | Bằng chứng từ bài báo | RSRZ | Kết luận |
+|---------|----------------------|------|----------|
+| **His449** | *"formed polar contacts with Ser289, His449, and Tyr473"* | 2.4 | ✅ Flexible |
+| **Ser289** | *"polar contacts with Ser289"* — hydroxyl rotation known | — | ✅ Flexible |
+| **Tyr473** | Part of **H12 (AF-2)** — bài báo dành toàn bộ Figure 2b để mô tả 3 conformation states của H12 | RSRZ **11.0** (Tyr477, đầu H12) | ✅ **Ưu tiên cao nhất** |
 
-### Synthesis & Mapping
-* **External Map**: By extracting kinetic evidence from the text, this protocol prevents the false-positive artifacts generated by blind flexibility algorithms, focusing the computational power strictly on the $\Omega$-loop gateway and its dynamic polar network.
-* **Internal Map**: The subtractive logic distills the target space to exactly five essential degrees of freedom, maintaining the absolute stability of the $\beta$-sheet orienting baseline. 
+#### Alternative Site
 
-### Dispositive Closure
-To accurately simulate the induced-fit mechanism for the 9F7W system, implement the mandatory flexible residues strictly as:
+| Residue | Bằng chứng từ bài báo | RSRZ | Kết luận |
+|---------|----------------------|------|----------|
+| **Arg288** | *"made an ionic interaction with Arg288 via its carboxylate group"* — được đề cập ở **cả orthosteric lẫn alternative site contact** | — | ✅ Flexible |
+| **Ser342** | *"hydrogen bonds between the carboxylate of 1 and the backbone of Ser342"* | — | ⚠️ Backbone contact — xem xét |
+| **Glu259** | *"between the secondary amine and the Glu259 side chain"* | — | ✅ Flexible |
 
-```bash
---flexres A:259,A:262,A:263,A:272,A:283
+---
+
+### TIER 1.5: Ω-loop — Evidence đặc biệt mạnh từ bài báo
+
+Bài báo nói rõ:
+> *"the ordered Ω-loop connecting H4 and H5, which had a **slightly different conformation** compared to the 1-bound structure and likely contributed to the overall stabilization"*
+
+Nhìn vào RSRZ validation report, toàn bộ chuỗi **264–273** đều có RSRZ cao:
+
 ```
-[cite_start]*(Note: Chain A is assumed as the 9F7W structure contains one molecule in the asymmetric unit [cite: 1399]).*
+Phe264: 4.2  Lys265: 4.6  His266: 2.4
+Ile267: 5.4  Thr268: 4.0  Pro269: 9.8
+Leu270: 4.7  Gln271: 2.8  Gln273: 3.6
+```
 
-You must maintain absolute rigidity for the I341/S342/M348 $\beta$-sheet anchor. This directive establishes a mathematically optimal grid for identifying novel compounds targeting the PPAR$\gamma$ $\Omega$ sub-pocket.
+Đây là bằng chứng kép: **bài báo xác nhận conformational shift + RSRZ xác nhận electron density kém = vùng thực sự động**.
+
+Residue đại diện được chọn: **Gln273** (đầu Ω-loop, gần alternative site nhất theo Figure 1c của bài báo, RSRZ 3.6 — vừa đủ linh hoạt mà không quá nhiễu).
+
+---
+
+### Quyết định cuối cùng — Áp dụng Bước 4 & 5 SOP
+
+**Bước 4 — Thermodynamic Veto:** Loại Ser342 ra vì đây là **backbone contact**, cho phép backbone flexible trong GNINA là sai về mặt sinh học. Loại Pro269 (RSRZ 9.8) vì Pro không có rotatable sidechain — RSRZ cao do loop mobility, không phải sidechain flexibility.
+
+**Bước 5 — Parsimony:** Giữ ≤ 5 residues.
+
+---
+
+### Danh sách Flexible Residues đề xuất
+
+```
+--flexres A:288,A:289,A:449,A:473,A:259
+```
+
+| # | Residue | Tier | Lý do |
+|---|---------|------|-------|
+| 1 | **Arg288** | Literature | Key ionic anchor — alternative site |
+| 2 | **Ser289** | Literature | Orthosteric H-bond donor |
+| 3 | **His449** | Literature | Orthosteric contact, tautomer đã sửa |
+| 4 | **Tyr473** | Literature + RSRZ | H12 dynamics, RSRZ 11.0 |
+| 5 | **Glu259** | Literature | Alternative site sidechain contact |
+
+**Tyr473 là ưu tiên cao nhất** vì là giao điểm của cả bằng chứng bài báo (H12 conformational dynamics) lẫn dữ liệu tinh thể học (RSRZ cực cao).
+
+Gln273 được dự phòng nếu bạn muốn thêm residue đại diện Ω-loop:
+```
+--flexres A:288,A:289,A:449,A:473,A:259,A:273
+```
+nhưng điều này đã ở ranh giới parsimony (6 residues), chỉ nên dùng nếu docking vào alternative site là trọng tâm chính.
 
 
 # **2. PPARA (7BQ2, PPARa Ligand-Binding Domain Structures with Endogenous Fatty Acids and Fibrates)** `--flexres A:273`
