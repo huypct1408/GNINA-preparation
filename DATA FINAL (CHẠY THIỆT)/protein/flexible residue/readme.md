@@ -583,6 +583,86 @@ Lập trường đối lập (FLOPP) cho rằng "cần nới lỏng His372 vì v
 Loại bỏ ngay lập tức danh sách 4 Å tự động của bạn. Thiết lập chính xác tham số `--flexres` trong GNINA với danh sách độc quyền sau: **ARG596, TRP599, PHE359, LEU607, GLN363, LEU368**. 
 Các gốc thuộc vòng phối trí Sắt (HIS367, HIS372, HIS550, ILE673, ASN554) và các gốc không có rotamer chức năng (PRO569, ALA410, ALA603) BẮT BUỘC phải duy trì trạng thái KHÓA CỨNG (RIGID). Chạy lệnh này để hội tụ quỹ đạo mô phỏng.
 
+# ALOX5 (PDB: 6NCF, The structure of Stable-5-Lipoxygenase bound to AKBA, Structural and mechanistic insights into 5-lipoxygenase inhibition by natural products.) `B:101,B:130,B:137,B:138,B:109,B:66,B:126`
+
+## Tổng hợp và Kết luận cuối cùng về Flexible Residues cho 6NCF ALOX5
+
+### So sánh hai ý kiến
+
+| Tiêu chí | Opinion 1 (VN) | Opinion 2 (EN) |
+|----------|----------------|----------------|
+| **Literature-Tier** | Arg101, His130, Thr137, Arg138, Val109 (5) | Arg101, His130, Thr137, Arg138, Val109 (5) |
+| **Adaptation-Tier** | Ile126 (1) | Leu66, Ile126, Lys133, Val110 (4) |
+| **Tổng cộng** | 6 residues | 9 residues |
+| **Phương pháp** | Strict literature + essential gatekeeper | Literature + structural adaptation |
+
+---
+
+### Phân tích của tôi
+
+Dựa trên nguyên tắc SOP đã thiết lập:
+
+| # | Residue | Evidence | Recommended | Rationale |
+|---|---------|----------|--------------|-----------|
+| 1 | **Arg101** | Literature - ionic anchor | ✅ YES | AKBA carboxylate charge pair - ESSENTIAL |
+| 2 | **His130** | Literature + mutagenesis | ✅ YES | C-ring keto contact, H130A data |
+| 3 | **Thr137** | Literature - H-bond | ✅ YES | Polar contact acetoxy group |
+| 4 | **Arg138** | Literature - H-bond | ✅ YES | Polar contact |
+| 5 | **Val109** | Literature - gatekeeper | ✅ YES | Shields Arg101 charge pair |
+| 6 | **Leu66** | Literature - hydrophobic floor | ⚠️ CONSIDER | Interdomain interface, bulky |
+| 7 | **Ile126** | Literature - hydrophobic surface | ⚠️ CONSIDER | Side chain rotatable, hydrophobic |
+| 8 | **Lys133** | Adaptation - hydrophobic wall | ❌ NO | Too peripheral, can be rigid |
+| 9 | **Val110** | Excluded - backbone contact | ❌ NO | Main chain contact only |
+
+---
+
+### Kết luận cuối cùng của tôi
+
+#### **RECOMMENDED: 6-7 residues**
+
+```bash
+--flexres B:101,B:130,B:137,B:138,B:109,B:66,B:126
+```
+
+| Residue | Justification |
+|---------|---------------|
+| **B:101** | Primary ionic anchor - MUST |
+| **B:130** | Mutagenesis validated - MUST |
+| **B:137** | Literature H-bond - MUST |
+| **B:138** | Literature H-bond - MUST |
+| **B:109** | Literature gatekeeper - MUST |
+| **B:66** | Adaptation - hydrophobic floor |
+| **B:126** | Adaptation - hydrophobic surface |
+
+---
+
+### Lý do loại trừ
+
+| Residue | Lý do |
+|---------|-------|
+| Val110 | Backbone contact only, không rotate sidechain |
+| Arg68 | Peripheral boundary, not direct contact |
+| Glu108 | Không được đề cập trong literature |
+| His125 | Không được đề cập là AKBA contact |
+| Gln129 | Không được đề cập là AKBA contact |
+| Glu134 | Peripheral, not critical |
+| Lys133 | Too far from core, can remain rigid |
+
+---
+
+### Execution Command
+
+```bash
+gnina -r alox5_6ncf_chainB_receptor.pdb -l your_ligand.sdf \
+  --autobox_ligand alox5_6ncf_akba.sdf \
+  --flexdist_ligand alox5_6ncf_akba.sdf \
+  --flexdist 4.0 \
+  --flexres B:101,B:130,B:137,B:138,B:109,B:66,B:126 \
+  -o docked.sdf
+```
+
+---
+
 
 # EGFR (1XKK, EGFR kinase domain complexed with a quinazoline inhibitor- GW572016, A unique structure for epidermal growth factor receptor bound to GW572016 (Lapatinib): relationships among protein conformation, inhibitor off-rate, and receptor activity in tumor cells.) `--flexres A:745,A:776,A:777,A:790,A:856`
 
