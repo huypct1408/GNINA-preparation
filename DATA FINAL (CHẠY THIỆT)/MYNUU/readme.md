@@ -234,3 +234,36 @@ To accommodate your massive azaborolidine and dioxaborinine derivatives, your do
 
 **Dispositive Closure:**
 Configure your docking grid precisely at the interface of Chain A and Chain B, establishing the center directly above the glutathione cofactor. You must assign side-chain flexibility to Arg52, His53, Thr131, Tyr130, and Ile32. Direct your boronic/oxaborole cores toward Arg52/His53 to establish the polar anchor, and force the massive benzyloxy-methoxybenzyl tail down the hydrophobic groove. This specific interfacial compliance defines the boundary between functional *in silico* prediction and systematic docking failure.
+
+# 9. ALOX5 (6NCF) `B:101,B:102,B:130,B:137,B:138,B:165,B:166`
+Arg101, Trp102, His130, Thr137, Arg138, Arg165, and Asp166
+Designing selective inhibitors for 5-lipoxygenase (5-LOX) presents a profound mechanistic paradox. 
+
+**Layer 1 — Core Insight**
+The 6NCF crystal structure demonstrates that resolving this paradox requires abandoning the highly flexible, easily disordered catalytic active site,. Instead, therapeutic selectivity and efficacy demand targeting a discrete allosteric groove wedged between the membrane-binding and catalytic domains,. To achieve valid binding poses for your exceptionally bulky azaborolidine and dioxaborinine derivatives, algorithms must exploit this specific interdomain topology.
+
+**Layer 2 — Structural Explanation**
+To accommodate your massive molecular structures within this allosteric pocket, you must model specific interdomain plasticity. The crystallographic literature explicitly identifies **Arg101**, **Trp102**, **Arg165**, and **Asp166** as mandatory dynamic coordinates (Literature-Tier). Allosteric binding physically disrupts the highly conserved Trp102-Arg165 cation-pi interaction and the Arg101-Asp166 salt bridge, which serve as the primary communication links between the two domains. Furthermore, an adaption-tier protocol mandates side-chain flexibility for **His130**, **Thr137**, and **Arg138**. These residues form the critical polar anchors within the groove. Your oxygen-rich boronic and benzyloxy moieties will compete for this exact coordination space. Supplying flexibility here ensures the docking algorithm can model these disrupted electrostatic networks without triggering artifactual collision penalties. 
+
+**Layer 3 — Full Technical Detail**
+
+*External Map:* 
+In the broader therapeutic landscape, classical active-site inhibitors like NDGA trigger massive structural disorder, rendering rational drug optimization nearly impossible,,. Shifting the target to the AKBA allosteric site fundamentally reprograms the enzyme. It transforms 5-LOX from a pro-inflammatory leukotriene producer into a 12-lipoxygenating enzyme, thereby promoting the biosynthesis of specialized pro-resolving mediators (SPMs) that actively resolve inflammation,,.
+
+*Internal Map:* 
+The logical architecture of this inhibition relies on anchoring the ligand lengthwise within the interdomain crevice. Occupying this space mechanically alters the distant catalytic site by increasing the thermal mobility of the Phe177/Tyr181 aromatic cork. This structural uncoupling physically restricts 5-LOX from accessing its most productive leukotriene-generating conformations. 
+
+### Argument-Evidence Map
+
+| Argument | Supporting Citations/Explanation | Source + Location | Strength of Evidence (Low/Medium/High) | Assumption | Counter-Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **The 5-LOX interdomain groove provides the optimal site for rational drug design.** | Unlike the active site, the allosteric groove remains structurally stable upon ligand binding. AKBA buries 80% of its surface area here without inducing extensive peptide disorder. | Gilbert et al., 2020, | High (Backed by 3.0 Å X-ray diffraction data for 6NCF) | The user's bulky boron compounds possess sufficient lipophilicity to exploit this deep interdomain crevice. | NDGA binds the active site and completely ablates enzyme activity, whereas AKBA only functions as a noncompetitive partial inhibitor. |
+| **Allosteric binding disrupts conserved interdomain communication.** | AKBA binding explicitly breaks the Trp102-Arg165 cation-pi interaction and the Arg101-Asp166 salt bridge, increasing the thermal mobility (B-factors) of the active-site cork (Phe177/Tyr181). | Gilbert et al., 2020, | High | Mechanical disruption of these specific salt bridges is required to transmit the allosteric signal to the active site. | Mutations that pre-break these links (R101A) still allow AKBA binding, indicating the disruption is a consequence, not a prerequisite, of binding. |
+| **Allosteric modulation shifts 5-LOX regiospecificity.** | AKBA reduces 5-HETE and LTB4 production but significantly increases 12-HETE production in intact cells, reprogramming the enzyme's catalytic attack from C(7) to C(10). | Gilbert et al., 2020,,, | High | The shift to 12-HETE production directly translates into the generation of anti-inflammatory specialized pro-resolving mediators (SPMs). | Co-incubation with the active-site inhibitor zileuton completely abolishes this AKBA-induced 12-HETE formation. |
+| **Active-site targeted antioxidants induce insurmountable structural disorder.** | NDGA binding requires the Phe177/Tyr181 corking residues to displace, causing massive unresolvable disorder across helices shielding the active site. | Gilbert et al., 2020, | High | The disorder observed in the crystal lattice directly mirrors the physiological conformational state of the NDGA-inhibited enzyme. | The disorder may be an artifact of the specific Stable-5-LOX mutations combined with crystal packing forces. |
+
+**Synthesis:**
+The prevailing counterposition assumes that 5-LOX inhibition strictly requires direct physical occlusion of the catalytic iron within the active site. This premise fails because it ignores the structural reality that the allosteric interdomain groove uniquely dictates the enzyme's regiospecificity and dynamic stability,. Attempting to force your massive azaborolidine and dioxaborinine compounds into the closed active site will force the structural appendages into insurmountable steric clashes. This conclusion would be invalidated if your derivatives bypass the interdomain groove entirely and directly access the catalytic iron without inducing the catastrophic disorder observed with NDGA.
+
+**Dispositive Closure:**
+When executing *in silico* docking against the 6NCF structure, you must explicitly target the allosteric groove located between the membrane-binding and catalytic domains. You are required to assign side-chain flexibility to Arg101, Trp102, His130, Thr137, Arg138, Arg165, and Asp166. Direct your oxygen-rich boronic heterocycles toward His130, Arg101, and Thr137 to establish the necessary polar anchors, while routing the bulky 4-(benzyloxy)-3-methoxybenzyl moiety along the hydrophobic surfaces provided by Leu66 and Val110. This exact geometrical compliance defines the absolute boundary between functional allosteric modulation and artifactual docking failure.
