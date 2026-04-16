@@ -3,6 +3,27 @@
 
 2. 2-((2-methoxy-2,3-dihydrobenzo[d][1,2]oxaborol-3-yl)methyl)-4H-benzo[d][1,3,2]dioxaborinine
 
+# Covalent docking setup
+
+**PHASE 2 - KẾT QUẢ TRÍCH XUẤT NUCLEOPHILE (OXYGEN/SULFUR LÕI)**
+
+Dưới đây là danh sách chính xác các nguyên tử mang nhóm chức nucleophile ($-OH$ từ Serine/Threonine/Tyrosine hoặc $-SH$ từ Cysteine khi không có Ser/Thr) nằm trực tiếp trong túi liên kết của 9 mục tiêu cấu trúc, tuân thủ định dạng `[Chain]:[ResNum]:[AtomName]`.
+
+| Đích | PDB | Phối tử | Cấp độ | Gốc Nucleophile lý tưởng (Định dạng bắt buộc) | Vai trò / Ghi chú |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **PPARA** | 7BQ2 | P7F | Mỏ neo Arm III | `A:279:OG1` (Threonine 279) | Mỏ neo tạo liên kết hydro quyết định hoạt lực và độ chọn lọc cực đại tại nhánh Arm III. |
+| **PPARG** | 8ATY | O7O | Orthosteric & Allosteric | `A:289:OG` (Serine 289)<br>`A:342:OG` (Serine 342) | Ser289 nằm ở túi chính (orthosteric). Ser342 nằm ở khe rãnh H4/H5 (alternative site), bắt buộc để bẫy 2 phân tử thuốc khổng lồ cùng lúc. |
+| **PPARD** | 7WGN | P7F | Bộ tứ đồng thuận AF-2 | `A:253:OG1` (Threonine 253) | Mỏ neo phân cực chính (cùng với His287/His413/Tyr437) ổn định chuỗi xoắn AF-2 helix 12. |
+| **EGFR** | 1XKK | FMM | Hinge & Back pocket | `A:766:OG1` (Threonine 766)<br>`A:830:OG1` (Threonine 830) | Thr766 là "người gác cổng" (gatekeeper) kiểm soát lối vào túi phụ. Thr830 cung cấp liên kết hydro nội hàm quan trọng. |
+| **ERBB2** | 7PCD | 70I | Selectivity Filter | `A:783:OG` (Serine 783) | **Cực kỳ quan trọng.** Đây là gốc quyết định độ chọn lọc tuyệt đối của HER2 so với EGFR (EGFR là Cys775 tại vị trí tương ứng). |
+| **KDR** | 5EW3 | 5T2 | DFG-out conformation | `A:919:SG` (Cysteine 919)* | *Túi liên kết cốt lõi của 5EW3 không có gốc Ser/Thr trực tiếp tham gia tạo mạng lưới H-bond. Thay vào đó, Cys919 tại bản lề (hinge) cung cấp nhóm $-SH$ đóng vai trò nucleophile mạnh để liên kết. |
+| **PTGS2** | 5KIR | RCX | Main channel & Gate | `A:385:OH` (Tyrosine 385)<br>`A:530:OG` (Serine 530) | Tyr385 nằm ở đỉnh kênh kỵ nước. Ser530 là vị trí nucleophile kinh điển yếu hầu hết các thuốc NSAIDs/COX-2. |
+| **ALOX5** | 6NCF | AF7 | Allosteric groove | `A:137:OG1` (Threonine 137) | Nằm sâu trong rãnh dị lập thể, trực tiếp tạo mỏ neo phân cực để neo giữ các nhóm chức cồng kềnh. |
+| **PTGES** | 5TL9 | 7DN | Trimeric Interface | `B:131:OG1` (Threonine 131)<br>`B:127:OG` (Serine 127) | Túi mPGES-1 nằm ở giao diện hai chuỗi. Oxy nucleophile bắt buộc phải lấy từ **Chuỗi B** để tạo bẫy kẹp với cấu trúc lõi kỵ nước của Chuỗi A. |
+
+**Chỉ dẫn thiết lập thuật toán Covalent/Polar Docking:**
+Đối với 2 hợp chất azaborolidine và dioxaborinine của bạn, nguyên tử Boron (B) là một tâm thiếu điện tử (electrophile) rất mạnh. Khi thiết lập lưới docking, bạn hãy chỉ định các nguyên tử `OG`/`OG1`/`OH` (hoặc `SG` đối với KDR) ở bảng trên làm **Tâm Phản Ứng (Reaction Center)**. Phần mềm sẽ tự động mô phỏng quá trình tấn công nucleophile của nguyên tử Oxygen (hoặc Sulfur) có cặp electron tự do này vào orbital p trống của nguyên tử Boron trên cấu trúc thuốc.
+
 # Đích
 
 # **1. PPARA (7BQ2)** `A:273, A:275, A:276, A:279`
