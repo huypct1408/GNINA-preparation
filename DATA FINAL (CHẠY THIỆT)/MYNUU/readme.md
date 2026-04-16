@@ -204,3 +204,33 @@ The prevailing counterposition assumes that mimicking the static binding pose of
 
 **Dispositive Closure:**
 When executing *in silico* docking for your specific azaborolidine and dioxaborinine derivatives against the 5KIR structure, you must explicitly target the COX-2 specific side pocket. Mandate side-chain flexibility for Val523, Arg513, His90, and Tyr385. Direct your oxygen-rich boronic/oxaborole moieties past Val523 toward Arg513 and His90 to establish the polar anchor. Concurrently, route the bulky 4-(benzyloxy)-3-methoxybenzyl moiety up toward Tyr385 into the hydrophobic main channel. This exact geometrical compliance defines the absolute boundary between highly selective COX-2 modulation and unselective binding failure.
+
+# 8. PTGES (5EW3) `B:28,B:32,B:52,B:53,A:130,A:134`
+Arg52, His53, Thr131, Tyr130, and Ile32
+Designing selective therapeutics for microsomal prostaglandin E synthase-1 (mPGES-1) requires navigating a complex trimeric interface where ligands must bridge adjacent protein chains while resting directly above a glutathione (GSH) cofactor. 
+
+The 5TL9 crystal structure demonstrates that resolving the spatial requirements of bulky ligands demands interfacial plasticity. Ligands achieve high affinity by anchoring at the cleft opening and projecting rigid extensions down shallow flanking grooves formed by adjacent monomers. The prevailing assumption that static docking against a single protein chain yields accurate predictions fails entirely here. Because mPGES-1 is a homotrimer, the active site resides squarely at the interface of two chains. Your prior strategy of selecting flexible residues across multiple chains (Chain A and Chain B) is not merely correct; it constitutes a structural mandate for this target. This conclusion would be invalidated only if your ligands target an uncharacterized, completely monomeric allosteric pocket.
+
+To accommodate your massive azaborolidine and dioxaborinine derivatives, your docking protocol must model the dynamic shifts of specific boundary residues. We extract the following flexible residues from the 5TL9 structure:
+
+**Literature-Tier Flexible Residues:**
+*   **Arg52 and His53 (Chain A):** These residues form the critical bidentate salt-bridge and hydrogen-bond network at the pocket opening. Your oxygen-rich boronic heterocycles will compete for this exact coordination space.
+
+**Adaption-Tier Flexible Residues:**
+*   **Thr131 and Ser127 (Chain B):** Located on the adjacent chain (forming the opposite wall of the flanking groove), these residues coordinate ordered water molecules. They must shift to prevent artifactual collision penalties with your extended benzyloxy appendages.
+*   **Tyr28, Ile32, Tyr130, and Gln134:** These residues define the deep hydrophobic cleft. Your bulky 4-(benzyloxy)-3-methoxybenzyl moiety demands volumetric expansion here. Ile32 specifically forms a deep sub-pocket that bulky methyl or aromatic groups penetrate.
+
+*External Map:* Traditional NSAIDs and COX-2 inhibitors carry severe cardiovascular risks due to the indiscriminate suppression of prostacyclin (PGI2). Targeting mPGES-1 circumvents this toxicity by selectively inhibiting inducible PGE2 formation without disrupting collateral prostanoid pathways.
+*Internal Map:* Optimization of the 5TL9 ligand (compound 16) relied entirely on translating cell-free enzymatic affinity into the Human Whole Blood (HWB) assay. Furthermore, mitigating off-target CYP2C9 inhibition required strict control of lipophilicity within the hydrophobic core.
+
+### Argument-Evidence Map
+
+| Argument | Supporting Citations/Explanation | Source + Location | Strength of Evidence | Assumption | Counter-Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **The mPGES-1 active site mandates multi-chain interface docking.** | The co-crystal structures explicitly demonstrate ligands interacting simultaneously with residues from "Chain 1" (Arg52, His53) and "Chain 2" (Ser127, Thr131). | Partridge et al., 2017 | High | A single monomer lacks the topological boundary required to form a complete, functional binding pocket. | Extremely small fragments might theoretically bind superficially to a single monomer without bridging the trimeric interface. |
+| **HWB PGE2 reduction defines the absolute metric for clinical translation.** | Inhibition of PGE2 production at the IC80 level in human whole blood directly correlates with efficacious *in vivo* plasma drug concentrations. | Partridge et al., 2017 | High | *In vitro* cell-free assays fail to capture physiological protein binding, cellular penetration, and membrane partition dynamics. | Nanomolar enzymatic inhibitors (e.g., compound 5, IC50 = 43 nM) frequently demonstrate severe efficacy drop-offs in HWB environments (IC50 = 8.91 µM). |
+| **Non-planar central constraints optimize groove trajectory.** | Replacing a central aromatic core with a five-membered aliphatic cyclopentane allowed the specific projection of substituents down the right-hand hydrophobic groove. | Partridge et al., 2017 | Medium | The user's dioxaborinine and azaborolidine rings possess sufficient non-planar geometry to mimic this highly specific trajectory. | Highly flexible, unconstrained aliphatic chains incur an insurmountable entropic penalty upon binding. |
+| **Lipophilicity reduction eliminates off-target CYP2C9 inhibition.** | Modifying the 2-alkylbenzoic acid derivatives to lower the calculated logD (removing halogens) eliminated single-point CYP2C9 inhibition. | Partridge et al., 2017 | Medium | The off-target interaction is driven primarily by nonspecific hydrophobic packing rather than specific coordinate hydrogen bonds. | Compound 9 exhibited lower clearance despite having similar CYP2C9 inhibition to compound 7, proving clearance mechanisms remain multifactorial. |
+
+**Dispositive Closure:**
+Configure your docking grid precisely at the interface of Chain A and Chain B, establishing the center directly above the glutathione cofactor. You must assign side-chain flexibility to Arg52, His53, Thr131, Tyr130, and Ile32. Direct your boronic/oxaborole cores toward Arg52/His53 to establish the polar anchor, and force the massive benzyloxy-methoxybenzyl tail down the hydrophobic groove. This specific interfacial compliance defines the boundary between functional *in silico* prediction and systematic docking failure.
