@@ -102,3 +102,35 @@ The prevailing counterposition assumes that active-state structures represent th
 
 **Dispositive Closure:**
 When executing *in silico* docking for your specific boron-containing derivatives against the 1XKK structure, you must explicitly target the expanded back pocket. You are required to assign side-chain flexibility to Met742, Leu753, Thr766, Thr830, Phe832, Leu834, and the Lys721/Asp831 pair. Evaluate poses based strictly on their ability to occupy the volumetric space vacated by the shifted C-helix while preserving the core hinge interaction at Met769. This exact geometrical compliance defines the boundary between functional in silico prediction and artifactual docking failure.
+
+# 5. ERBB2 (7PCD) `A:783, A:805, A:801, A:802`
+Ser783, Cys805, Met801, and Pro802
+Achieving HER2 selectivity without triggering dose-limiting epidermal growth factor receptor (EGFR) toxicity presents a profound structural paradox. 
+
+**Layer 1 — Core Insight**
+The 7PCD crystal structure resolves this paradox by exploiting a single amino acid variance in the hydrophobic back pocket. Highly selective inhibitors penetrate this space to engage Ser783, a residue uniquely present in HER2 compared to the homologous Cys775 in EGFR. To successfully dock your bulky, non-covalent azaborolidine and dioxaborinine derivatives, algorithms must exploit this specific selectivity filter while neutralizing the covalent constraints of the 7PCD template.
+
+**Layer 2 — Structural Explanation (Adaption-Tier Flexible Residues)**
+The 7PCD structure represents a covalently locked state. Your compounds lack an acrylamide warhead, mandating an adaption-tier protocol to define dynamic coordinates. First, you must assign flexibility to **Ser783**. This residue acts as the absolute selectivity determinant; its side-chain must rotate to accommodate your extended benzyloxy-methoxybenzyl tail within the back pocket. Second, mandate flexibility for **Cys805**. In 7PCD, Cys805 covalently binds the ligand, but for your massive boronic structures, this front-pocket residue must shift to prevent artifactual collision penalties. Third, establish plasticity at the hinge anchors **Met801** and **Pro802**. These residues must independently adjust to permit optimal hydrogen-bonding alignments with your heterocycles. 
+
+**Layer 3 — Full Technical Detail**
+
+*External Map:* 
+In the broader therapeutic landscape, pan-ERBB inhibitors fail because EGFR inhibition drives severe toxicity before HER2 exon 20 insertion mutations are adequately suppressed. Targeting Ser783 bridges this therapeutic gap, allowing profound tumor regression without collateral wild-type EGFR impairment.
+
+*Internal Map:* 
+The logical architecture relies on anchoring the heterocyclic core at the Met801/Pro802 hinge while driving a rigid extension into the back pocket. Disruption of either the covalent anchor (via a Cys805Ser mutation) or the back-pocket anchor (via a Ser783Cys mutation) structurally abolishes inhibitor efficacy. 
+
+### Argument-Evidence Map
+
+| Argument | Supporting Citations/Explanation | Source + Location | Strength of Evidence | Assumption | Counter-Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **HER2 selectivity exclusively depends on back-pocket Ser783 engagement.** | A Ser783Cys mutation in HER2 eliminates inhibitor potency, while the reverse Cys775Ser mutation in EGFR drastically increases it. | Wilding et al., 2022 | High | The user's benzyloxy tail possesses sufficient length and appropriate geometry to penetrate the back pocket. | Ligands that fail to reach the back pocket cannot utilize this selectivity filter and act as pan-ERBB inhibitors. |
+| **Cys805 governs front-pocket affinity and resistance mechanics.** | Cys805Ser mutations emerge as the dominant resistance mechanism against targeted covalent inhibitors during ENU mutagenesis screens. | Wilding et al., 2022 | High | Bulky boronic components occupy the exact spatial volume previously held by the acrylamide warhead. | Non-covalent inhibitors targeting allosteric pockets bypass Cys805 dependency entirely. |
+| **Exon 20 insertion efficacy does not require mutant-specific docking templates.** | Wild-type HER2 surrogate structures (7PCD) accurately predict the binding efficacy of inhibitors tested against aggressive HER2YVMA exon 20 insertion mutants. | Wilding et al., 2022 | High | The wild-type ATP-cleft geometry structurally mirrors the functional state of the hyperactive exon 20 insertion mutant. | Specific exon 20 insertions could radically deform the alpha-C helix, invalidating the wild-type template. |
+
+**Synthesis:**
+The prevailing counterposition assumes that overcoming EGFR-mediated toxicity requires abandoning the highly conserved ATP-binding cleft in favor of allosteric sites. This premise fails because it ignores the profound discriminative power of the Ser783/Cys775 micro-variance. This conclusion would be invalidated if your bulky azaborolidine derivatives fully occlude the front pocket without penetrating the back pocket, rendering the Ser783 selectivity filter irrelevant. 
+
+**Dispositive Closure:**
+When executing *in silico* docking against 7PCD, you must explicitly disable any covalent bonding parameters. Mandate side-chain flexibility for Ser783, Cys805, Met801, and Pro802. Direct your extended benzyloxy appendages strictly into the back pocket toward Ser783. This exact geometrical compliance defines the absolute boundary between dose-limiting EGFR cross-reactivity and highly selective HER2 modulation.
