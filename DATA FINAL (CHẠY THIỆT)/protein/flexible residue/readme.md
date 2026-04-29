@@ -929,3 +929,37 @@ Lập trường đối lập (FLOPP) cho rằng "nếu bài báo nói Cys919 t�
 Hủy bỏ danh sách 19 gốc hỗn loạn của bạn. Bạn BẮT BUỘC khai báo chính xác chuỗi tham số sau vào dòng lệnh GNINA:
 `--flexres A:885,A:916,A:1026`
 Các gốc còn lại, đặc biệt là Cys919 và Asp1046, phải được giữ nguyên vẹn ở trạng thái tĩnh. Khởi chạy hệ thống để ép lưới tọa độ hội tụ quanh khối 1,3-diarylpyrazol-aminoacid của bạn.
+
+
+# EGFR (4JQ8, Crystal structure of EGFR kinase domain in complex with compound 4b, Protein Kinase Inhibitor Design by Targeting the Asp-Phe-Gly (DFG) Motif: The Role of the DFG Motif in the Design of Epidermal Growth Factor Receptor Inhibitors) `A:831,A:694,A:699,A:702,A:820`
+
+### Bản Đồ Phân Bổ Tính Linh Động (Adaptive Flexibility Map)
+
+Hợp chất của bạn mang ba đặc điểm vật lý quyết định: lõi 1,3-diaryl pyrazole cồng kềnh, nhánh benzyl ether vươn dài, và một gốc amino acid mang khả năng phân ly điện tích. Chúng ta áp dụng Bộ lọc 4 Bước từ SOP để thẩm định 17 gốc trong bán kính 4 Å.
+
+**1. Bằng Chứng Động Học & Thích Ứng Tĩnh Điện (Bắt Buộc Linh Động)**
+*   **Mục tiêu:** Gốc `D831` (Aspartate thuộc motif DFG).
+*   **Quy chiếu cơ học:** Gốc amino acid trên ligand của bạn đóng vai trò tương tự như đuôi N,N-dimethylamino tích điện dương của hợp chất 4b. Nghiên cứu của Peng *et al.* chứng minh bằng dữ liệu tia X rằng chuỗi bên của D831 phải xoay (rotate) và tiến lại gần để hình thành cầu muối (salt bridge) mang tính sống còn với gốc base của ligand. Sự dịch chuyển này là phản ứng cơ học sinh tử để dung nạp điện tích. Nếu bạn khóa cứng `D831`, trường lực tĩnh điện sẽ tạo ra lực đẩy Coulomb nội tại, từ chối mọi cấu hình liên kết của phần amino acid.
+
+**2. Cổng Không Gian - Steric Gating (Ưu Tiên Linh Động Mức Độ Cao)**
+*   **Mục tiêu:** `L694`, `F699`, `V702`, `L820`.
+*   **Quy chiếu cơ học:** Các dẫn xuất 1,3-diaryl pyrazole và benzyl ether có thể tích cản trở không gian (steric bulk) rất lớn. Theo kết quả tinh thể học, L694, V702, và L820 tạo thành nắp đậy kỵ nước định vị trực tiếp các vòng thơm (ring-1 và ring-5) vươn ra khỏi lõi trung tâm. Khung SOP chỉ định rằng chúng ta phải kéo giãn không gian theo vector định hướng của phối tử cồng kềnh. Cấp quyền linh động cho các chuỗi bên (side-chains) của cụm kỵ nước này cho phép thuật toán IFD mở rộng thể tích túi gắn kết, tránh các xung đột Van der Waals chí mạng khi dung nạp nhánh benzyl ether.
+
+**3. Mỏ Neo Cấu Trúc - The Thermodynamic Veto (Bắt Buộc Đóng Băng)**
+*   **Mục tiêu:** `M769` (Met769) và `K721` (Lys721).
+*   **Quy chiếu cơ học (Phân tích FLOPP):** Quan điểm cho rằng mọi gốc lân cận đều nên linh động để tối đa hóa khả năng gắn kết hoàn toàn thất bại vì nó tước đoạt quyền phủ quyết nhiệt động học của hệ thống. 
+    *   `M769` nằm tại vùng bản lề (hinge region), thiết lập liên kết hydro bảo thủ với mạng lưới nitơ của lõi pyrazole (tương tự vòng furanopyrimidine). Lực liên kết này dựa trên nguyên tử hydro của bộ khung xương peptide (backbone NH), không phải chuỗi bên.
+    *   `K721` thiết lập một cầu muối nội phân tử bất khả xâm phạm với E738 (Glu738) nhằm khóa cấu trúc EGFR ở trạng thái hoạt động (active conformation). 
+    Đưa `M769` và `K721` vào danh sách flexible sẽ bẻ gãy bộ khung xương và làm tan chảy mạng lưới tĩnh điện lõi, dẫn đến hiện tượng bùng nổ tổ hợp (combinatorial explosion) và sinh ra điểm số giả tạo. Chúng bắt buộc phải là vật thể cứng (rigid-body).
+
+**4. Nhóm Tùy Chọn - Độ Năng Động Thấp (Semi-Flexible)**
+*   **Mục tiêu:** `T766`, `Q767`, `G772`, `R817`, `N818`.
+*   **Quy chiếu cơ học:** Các gốc này nằm ở vành đai ngoài hoặc tương tác thụ động với dung môi. Theo bước 3 của SOP (Steric Gating thứ cấp), bạn chỉ nên cấp quyền xoay nhẹ nhóm hydroxyl/amide (hydroxyl/amide rotation) cho `T766` và `Q767` nhằm cho phép thuật toán tái sắp xếp lại mạng lưới phân tử nước lót túi, nhưng không cấp quyền di chuyển toàn bộ chuỗi bên để tiết kiệm chu kỳ tính toán GPU.
+
+### Tổng Hợp Lệnh Thiết Lập IFD Trực Tiếp
+Dựa trên kiến trúc trên, thiết lập thông số phần mềm mô phỏng của bạn như sau:
+1.  **Fully Flexible Side-chains:** D831, L694, F699, V702, L820.
+2.  **Hydrogen/Hydroxyl Rotation Only:** T766, Q767.
+3.  **Strictly Rigid:** M769, K721, và các phần còn lại của bộ khung xương (backbone).
+
+Quyết định định tuyến IFD này duy trì lực hãm tự nhiên của vùng bản lề trong khi cấp không gian cho sự phình to của pyrazole/benzyl ether và phản ứng tĩnh điện của cụm amino acid. (Điều kiện kiểm chứng: Lập luận ưu tiên `D831` sẽ bị bác bỏ nếu gốc amino acid trên ligand của bạn bị khóa chặt bởi các liên kết hydro nội phân tử mạnh mẽ, khiến nó trung hòa hoàn toàn cực tính và mất đi động năng để bẻ cong lớp vỏ điện tĩnh của motif DFG).
