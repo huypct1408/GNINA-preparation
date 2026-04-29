@@ -1131,3 +1131,106 @@ Kết hợp lại, một version “đã được kiểm chứng” sẽ là:
 ***
 
 Nếu bạn muốn, mình có thể giúp bạn **viết lại nguyên khối đoạn SOP 3PP0** (Literature‑tier / Adaptive‑tier) với ngôn ngữ giống bạn, nhưng mọi claim về clash/outlier đều gắn với câu từ validation report (và bạn có thể trích dẫn số trang/atom pair khi cần).
+
+
+# PTGS2 (5IKR, The Structure of Mefenamic Acid Bound to Human Cyclooxygenase-2, Substrate-selective Inhibition of Cyclooxygeanse-2 by Fenamic Acid Derivatives Is Dependent on Peroxide Tone.) `A:120,A:355,A:385,A:530,A:387,A:522,A:352`
+
+Từ các dữ liệu bạn trích (bài Orlando 2016 + full validation 5IKR) và lập luận bạn viết, bộ flexible residues cho 5IKR dùng trong IFD có thể chốt lại như sau, tách rõ Literature‑tier và Adaptive‑tier, đúng với tiêu chí “chỉ gọi literature khi thật sự có bằng chứng”.  
+
+***
+
+## 1. Literature‑tier (được phép linh động chắc chắn)
+
+Nhóm này vừa có vai trò chức năng đã được mô tả trong COX‑2 literature, vừa có bằng chứng hình học/tương tác trong 5IKR hoặc các cấu trúc COX‑2 khác. [bionaturajournal](https://bionaturajournal.com/2025.02.02.3.html)
+
+**1) Tyr385 (Y385)**  
+- Là catalytic Tyr của COX‑2, nơi hình thành tyrosyl radical khi có peroxide tone; bài Orlando mô tả trực tiếp vai trò này trong “substrate‑selective inhibition”. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC2674713/)
+- Trong 5IKR, vòng phenol Y385 tiếp xúc trực tiếp với mefenamic acid, nằm trong apex channel; Validation report ghi nhận geometry/tương tác nhạy cảm quanh residue này. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/595e5046-56d2-4335-9a86-e169a9a7ed39/PTGS2-5IKR-documentation.pdf)
+→ Literature‑tier: cho phép side‑chain Y385 xoay (χ angles) trong IFD, backbone giữ constraint.
+
+**2) Ser530 (S530)**  
+- Site kinh điển aspirin acetylation; trong 5IKR, OH của Ser530 là một trong hai H‑bond anchors cho carboxylate mefenamate, được mô tả rõ trong bài của Orlando. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/595e5046-56d2-4335-9a86-e169a9a7ed39/PTGS2-5IKR-documentation.pdf)
+→ Literature‑tier: cho phép side‑chain S530 (χ, hướng OG–HG) linh động.
+
+**3) Arg120 (R120)**  
+- Residue cổng kênh COX‑2, là mỏ neo tương tác điện tích với carboxylate của nhiều NSAID (ibuprofen, flurbiprofen, celecoxib…), được nhắc trong review COX‑2 và các docking COX‑2 gần đây. [sciencedirect](https://www.sciencedirect.com/science/article/pii/S0223523426002266)
+- Dù fenamates trong 5IKR ở orientation “inverted”, Arg120 vẫn là gatekeeper, quan trọng khi bạn đưa scaffold 1,3‑diarylpyrazole‑amino acid có nhóm ion hoá vào vùng mouth. [bionaturajournal](https://bionaturajournal.com/2025.02.02.3.html)
+→ Literature‑tier: cho phép side‑chain R120 linh động (rotamer guanidinium).
+
+**4) Tyr355 (Y355)**  
+- Nằm gần Arg120 ở entrance; nhiều bài COX‑2 chỉ ra Tyr355 tham gia shaping “entrance pocket” cho COX‑2 selectivity cùng với Arg120 và Val523. [pubs.acs](https://pubs.acs.org/doi/10.1021/acsomega.5c02159)
+- Trong các cấu trúc COX‑2 với NSAID, vòng Tyr355 quay để accommodate các head‑group khác nhau. [pubs.acs](https://pubs.acs.org/doi/10.1021/acsomega.5c02159)
+→ Literature‑tier: cho phép side‑chain Y355 linh động.
+
+**5) Trp387 (W387)**  
+- Là một phần “roof” aromatic của cyclooxygenase channel; documentation 5IKR và các bài COX‑2 khác cho thấy W387 liên quan đến packing với diaryl rings và thay đổi động học khi có peroxide/ligand. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC2674713/)
+→ Literature‑tier: cho phép side‑chain W387 linh động.
+
+**6) Met522 (M522)**  
+- Residue ở vùng tail/side pocket, có đề cập trong các nghiên cứu COX‑2 như một trong những vị trí giúp tạo “side pocket” linh hoạt cho COX‑2 (cùng Val523, Phe518, v.v.), ảnh hưởng đến dung nạp diaryl substituents. [bionaturajournal](https://bionaturajournal.com/2025.02.02.3.html)
+- Trong 5IKR và các cấu trúc NSAID khác, Met522 nằm gần group aromatic của ligand và có thể đổi rotamer để nhường chỗ. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/595e5046-56d2-4335-9a86-e169a9a7ed39/PTGS2-5IKR-documentation.pdf)
+→ Literature‑tier (cấp nhẹ hơn Y385/S530 nhưng vẫn có hỗ trợ): cho phép side‑chain M522 linh động.
+
+**7) Leu352 (L352)**  
+- Validation 5IKR ghi nhận va chạm gần giữa side‑chain Leu352 và Phe518 (vd. HD11–CE2 ~2.5 Å), thể hiện internal steric stress trong kênh hydrophobic. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/107b8bc2-1524-4350-ab28-94808a2e29e2/PTGS2-5ikr_full_validation.pdf)
+- L352 cùng Y348, V349 tạo thành một vách của pocket; geometry report cho thấy region này căng, hỗ trợ việc cho L352 xoay để giải toả stress khi ligand mới (1,3‑diarylpyrazole) cồng kềnh hơn mefenamate. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/107b8bc2-1524-4350-ab28-94808a2e29e2/PTGS2-5ikr_full_validation.pdf)
+→ Literature/validation‑supported: cho phép side‑chain L352 linh động.
+
+Tóm lại, từ đồng thuận giữa bài Orlando, các review/docking COX‑2, và validation:
+
+**Literature‑tier cho 5IKR** (được phép flexible rõ ràng):  
+- Arg120 (R120)  
+- Tyr355 (Y355)  
+- Tyr385 (Y385)  
+- Ser530 (S530)  
+- Trp387 (W387)  
+- Met522 (M522)  
+- Leu352 (L352, dựa trên steric stress trong validation)
+
+***
+
+## 2. Adaptive‑tier (linh động theo ngữ cảnh, không gắn nhãn “literature‑confirmed”)
+
+Nhóm nằm trong 4 Å shell của ligand crystal 5IKR nhưng **chưa có** bằng chứng trực tiếp (mutagenesis hoặc mô tả chức năng rõ ràng) trong “Substrate‑selective inhibition…” hoặc COX‑2 literature dành riêng cho fenamates/diarylpyrazoles. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/107b8bc2-1524-4350-ab28-94808a2e29e2/PTGS2-5ikr_full_validation.pdf)
+
+Bạn đã phân loại rất hợp lý:
+
+- **Strategic flexible (nên cho linh động nếu ligand đụng tới):**  
+  - Y348 – aromatic wall, tạo “cửa” gần Y355. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/595e5046-56d2-4335-9a86-e169a9a7ed39/PTGS2-5IKR-documentation.pdf)
+  - F381 – aromatic roof; vài docking COX‑2 coi là residue tương tác π thêm, nhưng không là anchor bắt buộc. [bionaturajournal](https://bionaturajournal.com/2025.02.02.3.html)
+
+- **Conditional flexible:**  
+  - Y355, W387, M522 đã được đưa lên literature‑tier ở trên.  
+  - Trong adaptive‑logic của bạn, nếu 1,3‑diarylpyrazole có substituent (halogen/methyl/bulky aryl) đâm thẳng vào side‑chain Y348, Y355, F381, M522, thì cho phép những residue này sampling rotamer nhiều hơn (IFD high‑flex mode). [bionaturajournal](https://bionaturajournal.com/2025.02.02.3.html)
+
+- **Rigid core (nên giữ cứng, trừ khi có bằng chứng mới):**  
+  - V116, V349, S353, L359, L384, L531, G526 – hầu hết là hydrophobic/Gly tạo nền tường kênh, Validation report không ghi clash nghiêm trọng, literature không nêu vai trò chức năng đặc biệt với fenamates. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/107b8bc2-1524-4350-ab28-94808a2e29e2/PTGS2-5ikr_full_validation.pdf)
+  - A527: có clash nhẹ với Pro528 trong validation; nhưng Alanine thực tế gần như không có DOF side‑chain, nên coi là rigid, chỉ backbone bị restrain mềm. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/107b8bc2-1524-4350-ab28-94808a2e29e2/PTGS2-5ikr_full_validation.pdf)
+
+→ Adaptive‑tier: chỉ được đánh dấu “flexible” khi cần thiết theo kết quả docking mồi hoặc nếu bạn chủ động khảo sát thêm bằng MD/IFD vòng sau.
+
+***
+
+## 3. Chốt lại danh sách flexible cho 5IKR (từ đồng thuận)
+
+Với tiêu chí bạn đặt ra (liêm chính khoa học, chỉ gọi literature‑tier khi có bằng chứng), có thể chốt như sau cho IFD trên 5IKR với dẫn xuất 1,3‑diarylpyrazole‑amino acid:
+
+### Literature‑tier – luôn flexible (side‑chain), backbone restrained
+
+- R120 (Arg120) – gatekeeper điện tích ở mouth. [sciencedirect](https://www.sciencedirect.com/science/article/pii/S0223523426002266)
+- Y355 (Tyr355) – entrance aromatic lip. [pubs.acs](https://pubs.acs.org/doi/10.1021/acsomega.5c02159)
+- Y385 (Tyr385) – catalytic Tyr, direct contact với ligand + peroxide‑dependent chemistry. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC2674713/)
+- S530 (Ser530) – H‑bond anchor, aspirin site. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/595e5046-56d2-4335-9a86-e169a9a7ed39/PTGS2-5IKR-documentation.pdf)
+- W387 (Trp387) – roof aromatic, tạo không gian cho diaryl ring. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC2674713/)
+- M522 (Met522) – side pocket modulator cho bulky substituents. [pubs.acs](https://pubs.acs.org/doi/10.1021/acsomega.5c02159)
+- L352 (Leu352) – internal steric stress contact trong validation, vách kênh kế bên aromatic cluster. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/107b8bc2-1524-4350-ab28-94808a2e29e2/PTGS2-5ikr_full_validation.pdf)
+
+### Adaptive‑tier – linh động theo ngữ cảnh ligand
+
+- Y348, F381 (+ có thể tăng freedom thêm cho Y355, W387, M522 nếu ligand rất cồng kềnh). [bionaturajournal](https://bionaturajournal.com/2025.02.02.3.html)
+
+### Rigid core (giữ cứng trong IFD chuẩn)
+
+- V116, V349, S353, L359, L384, G526, A527, L531 – chỉ backbone restrained, side‑chain giữ nguyên rotamer trừ khi bạn có dữ liệu mới. [ppl-ai-file-upload.s3.amazonaws](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14721697/595e5046-56d2-4335-9a86-e169a9a7ed39/PTGS2-5IKR-documentation.pdf)
+
+Nếu bạn muốn, bước tiếp theo mình có thể viết luôn một block cấu hình (ví dụ cho Schrödinger IFD hoặc script tự viết) liệt kê rõ các residue này vào từng “flex group” để bạn copy‑paste vào workflow.
