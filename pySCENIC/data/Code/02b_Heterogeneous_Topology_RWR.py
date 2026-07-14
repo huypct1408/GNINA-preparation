@@ -1,992 +1,1451 @@
-# Layer 2B: Heterogeneous Topology RWR Pipeline
-
-## Purpose
-# Integrate heterogeneous biological networks (SCENIC GRN + STRING PPI) and apply Random Walk with Restart (RWR) to identify drug-responsive hub genes.
-## Stage 1: Imports & Configuration
-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # ============================================================
-# Stage 1: Imports & Configuration
+# 02B — Layer 2: LIONESS Multi-Model Inference (v2.4.0)
 # ============================================================
+# Purpose
+#   Infer single-sample LIONESS GRNs for EVERY ModelID declared in
+#   cfg.L2_TARGET_MODELS_LIST, while preserving absolute scientific
+#   integrity of the original single-model pipeline.
+#
+# Architecture (Iteration + lineage-shared PANDA)
+#   1. Validate cfg.L2_TARGET_MODELS_LIST (DL2-26)
+#   2. Resolve each ACH ID → OncotreeLineage via Model.csv ONLY (DL2-15)
+#   3. Group targets by lineage
+#   4. For each lineage present in 02A foundation freeze:
+#        - load frozen expr / sample_order / genes_post_qc ONCE
+#        - load + SHA-256-verify motif/PPI priors ONCE
+#        - build ONE Panda aggregate e^(α) for the lineage (DL2-25)
+#        - verify flatten order C/F ONCE against export_panda_results
+#        - for each target ModelID in lineage ∩ list:
+#              Lioness(start=pos, end=pos, save_single=True)
+#              label edges with verified order
+#              write Z_{ModelID}_LIONESS.tsv + per-sample run manifest
+#        - write lineage-level multi-run summary
+#   5. Write global multi-model gate report + full run ledger (DL2-28)
+#
+# Scientific integrity (STRICT)
+#   - NO SNAIL recomputation (DL2-22)
+#   - NO raw CCLE expression load (DL2-22)
+#   - NO cross-lineage pooling of the aggregate network (DL2-25)
+#   - NO rebuilding PANDA per target inside the same lineage (DL2-25)
+#   - NO silent drop of declared IDs (DL2-28)
+#   - NO edge weight re-weighting / manual edit
+#   - Separate multi-model log + gate report (DL2-23)
+#
+# Missing-target policy
+#   cfg.L2_MULTI_MODEL_ON_MISSING:
+#     "skip_missing_with_ledger" (default) — SKIP + ledger, continue
+#     "fail" — any missing ID aborts the whole multi-model run
+#
+# Requires
+#   - Stage 8F outputs of 02A (frozen_lineage_inputs/)
+#   - config_system.py v3.4.0+
+#   - netZooPy == cfg.NETZOOPY_REQUIRED_VERSION
+# ============================================================
+
+from __future__ import annotations
+
 import sys
+import json
+import time
+import shutil
+import hashlib
+import tempfile
 import warnings
+import traceback
 from pathlib import Path
 from datetime import datetime
-import json
-import gzip
+from collections import defaultdict, OrderedDict
 
-# Data manipulation
 import pandas as pd
 import numpy as np
 
-# Network analysis
-import networkx as nx
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
 
-# Visualization
-import matplotlib.pyplot as plt
-import seaborn as sns
+# ---------------------------------------------------------------------------
+# Ensure project root (where config_system.py lives) is importable
+# Works as:
+#   - python path/to/02B_Layer2_LIONESS_MULTI_MODEL.py   (__file__ defined)
+#   - Jupyter / IPython %run or paste                     (__file__ absent)
+# Scientific note: path bootstrap only affects import resolution.
+# All scientific paths still come from config_system.py constants.
+# ---------------------------------------------------------------------------
 
-# Progress bar
-from tqdm.notebook import tqdm
+def _bootstrap_project_root() -> Path:
+    """Locate directory containing config_system.py without requiring __file__."""
+    candidates = []
 
-# Suppress warnings for cleaner output
-warnings.filterwarnings('ignore')
+    # 1) Script directory (CLI / %run with __file__)
+    try:
+        here = Path(__file__).resolve().parent  # type: ignore[name-defined]
+        candidates.append(here)
+        candidates.append(here.parent)
+        candidates.append(here.parent.parent)
+    except NameError:
+        # Jupyter / interactive: __file__ is undefined — expected, not an error
+        pass
 
-# Set display options
-pd.set_option('display.max_columns', None)
-pd.set_option('display.max_rows', 100)
-pd.set_option('display.width', None)
+    # 2) IPython/Jupyter current working directory chain
+    cwd = Path.cwd().resolve()
+    candidates.append(cwd)
+    candidates.append(cwd.parent)
+    # common layout: cwd = project root, or cwd = project/notebooks
+    candidates.append(cwd / "notebooks")
+    if (cwd / "pyscenic").is_dir():
+        candidates.append(cwd / "pyscenic")
 
-print(f"Python version: {sys.version}")
-print(f"Pandas version: {pd.__version__}")
-print(f"NetworkX version: {nx.__version__}")
-print(f"NumPy version: {np.__version__}")
-# Import config_system.py v1.4
+    # 3) Known lab host path (frozen deployment location)
+    candidates.append(
+        Path("/home/labhhc5/Documents/workspace/D21/Duong Huy/pyscenic")
+    )
+
+    # 4) sys.path entries already present
+    for p in list(sys.path):
+        if p:
+            candidates.append(Path(p))
+
+    seen = set()
+    ordered = []
+    for c in candidates:
+        try:
+            r = c.resolve()
+        except Exception:
+            continue
+        if r in seen:
+            continue
+        seen.add(r)
+        ordered.append(r)
+
+    for c in ordered:
+        if (c / "config_system.py").is_file():
+            if str(c) not in sys.path:
+                sys.path.insert(0, str(c))
+            return c
+
+    raise FileNotFoundError(
+        "[M1] Cannot locate config_system.py.\n"
+        "Jupyter fix: %cd to the pyscenic project root (folder that contains "
+        "config_system.py), then re-run this cell.\n"
+        f"  Tried cwd={cwd}\n"
+        f"  Searched {len(ordered)} candidate roots."
+    )
+
+
+_PROJECT_ROOT = _bootstrap_project_root()
+print(f"[M1] config root : {_PROJECT_ROOT}")
+
 import config_system as cfg
 
-# Print configuration summary
+
+# =============================================================================
+# STAGE M1: IMPORTS & CONFIGURATION
+# =============================================================================
+
+logger = cfg.setup_logger(
+    "LIONESS_MultiModel",
+    logfile=cfg.LAYER2B_MULTI_LOG_FILE,
+    reset_handlers=True,
+)
+
 cfg.print_config_summary()
 
-# Setup logger
-logger = cfg.setup_logger("Layer2B")
-# Verify Layer 2B resources
-print("\n" + "="*64)
-print("LAYER 2B RESOURCE CHECK")
-print("="*64)
+NOTEBOOK_START_TIME = datetime.now()
+PIPELINE_VERSION = "2.4.0"
+CONFIG_VERSION = "config_system.py v3.4.0"
 
-resources = cfg.check_layer2b_resources()
-all_required_ok = True
+logger.info("=" * 80)
+logger.info("02B LIONESS MULTI-MODEL NOTEBOOK START — v2.4.0")
+logger.info(f"Start time   : {NOTEBOOK_START_TIME.isoformat()}")
+logger.info(f"Python       : {sys.version}")
+logger.info(f"Pandas       : {pd.__version__}")
+logger.info(f"NumPy        : {np.__version__}")
+logger.info(f"Run mode     : {cfg.LAYER2_RUN_MODE}")
+logger.info(f"Architecture : {cfg.LAYER2_NOTEBOOK_ARCHITECTURE}")
+logger.info("=" * 80)
 
-for key, available in resources.items():
-    if key == "layer2a_scenic_grn":
-        # Optional - graceful degradation
-        status = "OK" if available else "MISSING (Graceful Degradation: STRING-only graph)"
-    else:
-        status = "OK" if available else "MISSING - REQUIRED!"
-        if not available and key != "layer2a_scenic_grn":
-            all_required_ok = False
-    print(f"  {key}: {status}")
+print(f"\nNotebook     : {cfg.LAYER2_NOTEBOOK_02B_MULTI_NAME}")
+print(f"Started      : {NOTEBOOK_START_TIME.strftime('%Y-%m-%d %H:%M:%S')}")
+print(f"Run mode     : {cfg.LAYER2_RUN_MODE}")
+print(f"Ref policy   : {cfg.LIONESS_REFERENCE_POLICY}")
+print(f"Missing pol. : {cfg.L2_MULTI_MODEL_ON_MISSING}")
+print(f"Log file     : {cfg.LAYER2B_MULTI_LOG_FILE.name}")
 
-print("="*64)
-if all_required_ok:
-    print("All required resources available. Ready to proceed.")
-else:
-    print("WARNING: Some required resources are missing!")
-    print("Please check data paths in config_system.py")
-# Create output directory
-cfg.LAYER2B_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-print(f"Output directory: {cfg.LAYER2B_OUTPUT_DIR}")
-
-# Record pipeline start
-PIPELINE_START = datetime.now()
-print(f"Pipeline started at: {PIPELINE_START.strftime('%Y-%m-%d %H:%M:%S')}")
-
-## Stage 2: Load SCENIC GRN (Graceful Degradation)
-
-#Load transcriptional regulatory edges from Layer 2A (if available).  
-#**Graceful Degradation**: If L2A output missing, proceed with STRING-only graph.
-# ============================================================
-# Stage 2: Load SCENIC GRN (Graceful Degradation)
-# ============================================================
-print("="*64)
-print("STAGE 2: LOAD SCENIC GRN")
-print("="*64)
-
-# Check for Layer 2A output
-L2A_MASTER_REGULONS_PATH = cfg.LAYER2A_OUTPUT_DIR / cfg.L2A_MASTER_REGULONS_CSV
-L2A_MASTER_ADJACENCIES_PATH = cfg.LAYER2A_OUTPUT_DIR / cfg.L2A_MASTER_ADJACENCIES_CSV
-
-scenic_edges_df = None
-SCENIC_AVAILABLE = False
-
-# Try to load cisTarget-pruned regulons first, fallback to raw adjacencies
-if L2A_MASTER_REGULONS_PATH.exists():
-    print(f"Loading cisTarget-pruned regulons from: {L2A_MASTER_REGULONS_PATH}")
-    scenic_edges_df = pd.read_csv(L2A_MASTER_REGULONS_PATH)
-    SCENIC_AVAILABLE = True
-    print(f"  Loaded {len(scenic_edges_df):,} edges (cisTarget pruned)")
-elif L2A_MASTER_ADJACENCIES_PATH.exists():
-    print(f"cisTarget regulons not found. Loading raw GRNBoost2 adjacencies from: {L2A_MASTER_ADJACENCIES_PATH}")
-    scenic_edges_df = pd.read_csv(L2A_MASTER_ADJACENCIES_PATH)
-    SCENIC_AVAILABLE = True
-    print(f"  Loaded {len(scenic_edges_df):,} edges (raw GRNBoost2)")
-else:
-    print("WARNING: No SCENIC GRN available (Layer 2A not executed).")
-    print("GRACEFUL DEGRADATION: Proceeding with STRING-only heterogeneous graph.")
-    print("  -> Graph will contain PPI edges only (no transcriptional regulation)")
-    print("  -> Run 02a_SCENIC_GRN_Inference.ipynb to add transcriptional edges")
-
-if SCENIC_AVAILABLE:
-    # Normalize gene names in SCENIC edges
-    print("\nNormalizing gene names in SCENIC edges...")
-    scenic_edges_df['Source_Normalized'] = scenic_edges_df[cfg.COL_GRN_SOURCE].apply(cfg.normalize_gene_name)
-    scenic_edges_df['Target_Normalized'] = scenic_edges_df[cfg.COL_GRN_TARGET].apply(cfg.normalize_gene_name)
-    
-    # Preview
-    print(f"\nSCENIC edge preview:")
-    display(scenic_edges_df.head(10))
-    
-    # Statistics
-    n_tfs = scenic_edges_df['Source_Normalized'].nunique()
-    n_targets = scenic_edges_df['Target_Normalized'].nunique()
-    print(f"\nSCENIC Statistics:")
-    print(f"  Unique TFs: {n_tfs:,}")
-    print(f"  Unique targets: {n_targets:,}")
-    print(f"  Total edges: {len(scenic_edges_df):,}")
-## Stage 3: Load STRING PPI (Physical Links, Score >= 700)
-
-#Load high-confidence physical protein-protein interactions from STRING v12.0.  
-#Only use `physical.links` (direct binding) to avoid hairball effect from co-expression noise.
-# ============================================================
-# Stage 3: Load STRING PPI (Physical Links)
-# ============================================================
-print("="*64)
-print("STAGE 3: LOAD STRING PPI")
-print("="*64)
-
-print(f"Loading STRING physical links from: {cfg.STRING_PHYSICAL_LINKS_FILE}")
-print(f"  Minimum confidence threshold: {cfg.STRING_MIN_CONFIDENCE}")
-
-# Load physical.links (gzipped)
-string_ppi_df = pd.read_csv(
-    cfg.STRING_PHYSICAL_LINKS_FILE,
-    sep=' ',
-    compression='gzip'
-)
-
-print(f"  Raw edges loaded: {len(string_ppi_df):,}")
-print(f"  Columns: {list(string_ppi_df.columns)}")
-
-# Preview raw data
-print("\nRaw STRING data preview:")
-display(string_ppi_df.head())
-# Filter by confidence score
-print(f"\nFiltering by combined_score >= {cfg.STRING_MIN_CONFIDENCE}...")
-string_ppi_filtered = string_ppi_df[string_ppi_df['combined_score'] >= cfg.STRING_MIN_CONFIDENCE].copy()
-print(f"  High-confidence edges: {len(string_ppi_filtered):,}")
-
-# Score distribution
-print(f"\nScore distribution (filtered):")
-print(string_ppi_filtered['combined_score'].describe())
-# Load STRING aliases for ENSP -> Gene symbol mapping
-print(f"\nLoading STRING aliases from: {cfg.STRING_ALIASES_FILE}")
-
-string_aliases_df = pd.read_csv(
-    cfg.STRING_ALIASES_FILE,
-    sep='\t',
-    compression='gzip',
-    names=['string_protein_id', 'alias', 'source']
-)
-
-print(f"  Total alias records: {len(string_aliases_df):,}")
-print(f"  Unique proteins: {string_aliases_df['string_protein_id'].nunique():,}")
-
-# Filter for gene symbols (source contains 'Ensembl_HGNC' or 'BioMart_HUGO')
-# These are the most reliable gene symbol mappings
-gene_symbol_sources = ['Ensembl_HGNC', 'BioMart_HUGO', 'Ensembl_gene', 'BLAST_UniProt_GN']
-gene_aliases = string_aliases_df[
-    string_aliases_df['source'].isin(gene_symbol_sources)
-].copy()
-
-print(f"  Gene symbol aliases: {len(gene_aliases):,}")
-print(f"  Sources used: {gene_aliases['source'].value_counts().to_dict()}")
-# Create ENSP -> Gene symbol mapping (prioritize HGNC)
-print("\nCreating ENSP -> Gene symbol mapping...")
-
-# Deduplicate: keep first (prioritized by source order)
-gene_aliases_sorted = gene_aliases.sort_values(
-    'source',
-    key=lambda x: x.map({s: i for i, s in enumerate(gene_symbol_sources)})
-)
-ensp_to_gene = gene_aliases_sorted.drop_duplicates('string_protein_id', keep='first')
-ensp_to_gene_dict = dict(zip(ensp_to_gene['string_protein_id'], ensp_to_gene['alias']))
-
-print(f"  Unique ENSP -> Gene mappings: {len(ensp_to_gene_dict):,}")
-
-# Test mapping
-test_ensp = list(ensp_to_gene_dict.keys())[:5]
-print("\nSample mappings:")
-for ensp in test_ensp:
-    print(f"  {ensp} -> {ensp_to_gene_dict[ensp]}")
-# Map ENSP IDs to gene symbols in PPI data
-print("\nMapping ENSP IDs to gene symbols...")
-
-string_ppi_filtered['Gene1'] = string_ppi_filtered['protein1'].map(ensp_to_gene_dict)
-string_ppi_filtered['Gene2'] = string_ppi_filtered['protein2'].map(ensp_to_gene_dict)
-
-# Check mapping success rate
-mapped_gene1 = string_ppi_filtered['Gene1'].notna().sum()
-mapped_gene2 = string_ppi_filtered['Gene2'].notna().sum()
-total_edges = len(string_ppi_filtered)
-
-print(f"  Gene1 mapping rate: {mapped_gene1:,}/{total_edges:,} ({100*mapped_gene1/total_edges:.1f}%)")
-print(f"  Gene2 mapping rate: {mapped_gene2:,}/{total_edges:,} ({100*mapped_gene2/total_edges:.1f}%)")
-
-# Keep only edges where both proteins mapped successfully
-string_ppi_mapped = string_ppi_filtered.dropna(subset=['Gene1', 'Gene2']).copy()
-print(f"  Edges with both genes mapped: {len(string_ppi_mapped):,}")
-
-# Normalize gene names
-string_ppi_mapped['Gene1_Normalized'] = string_ppi_mapped['Gene1'].apply(cfg.normalize_gene_name)
-string_ppi_mapped['Gene2_Normalized'] = string_ppi_mapped['Gene2'].apply(cfg.normalize_gene_name)
-
-print("\nMapped PPI preview:")
-display(string_ppi_mapped[['protein1', 'protein2', 'Gene1', 'Gene2', 'Gene1_Normalized', 'Gene2_Normalized', 'combined_score']].head(10))
-# Summary statistics
-print("\nSTRING PPI Summary:")
-print(f"  Total high-confidence edges: {len(string_ppi_mapped):,}")
-print(f"  Unique genes: {pd.concat([string_ppi_mapped['Gene1_Normalized'], string_ppi_mapped['Gene2_Normalized']]).nunique():,}")
-print(f"  Score range: {string_ppi_mapped['combined_score'].min()} - {string_ppi_mapped['combined_score'].max()}")
-
-## Stage 4: Load Cell Line TPM Expression
-
-#Load cell line-specific expression data for P0 calibration.  
-#Expression level determines tissue relevance of drug target signal.
-# ============================================================
-# Stage 4: Load Cell Line TPM Expression
-# ============================================================
-
-print("="*64)
-print(f"STAGE 4: LOAD {cfg.TARGET_CELL_LINE} EXPRESSION")
-print("="*64)
-
-if cfg.CCLE_TPM_EXPRESSION_CSV.exists():
-    EXPRESSION_FILE = cfg.CCLE_TPM_EXPRESSION_CSV
-    EXPRESSION_TYPE = "TPM_log2(x+1)"
-    print(f"Using TPM expression (recommended for P0 calibration)")
-else:
-    EXPRESSION_FILE = cfg.CCLE_DATA_DIR / "OmicsExpressionRawReadCountH_thesis_cell_lines_only.csv"
-    EXPRESSION_TYPE = "RawReadCount"
-    print(f"WARNING: TPM file not found, using Raw Read Count")
-
-print(f"Loading expression data from: {EXPRESSION_FILE}")
-
-# HOTFIX 25Q3: Không dùng index_col=0
-expression_df = pd.read_csv(EXPRESSION_FILE)
-
-# Lọc bản ghi mặc định và set ModelID làm Index
-if 'IsDefaultEntryForModel' in expression_df.columns:
-    expression_df = expression_df[expression_df['IsDefaultEntryForModel'] == 'Yes']
-if 'ModelID' in expression_df.columns:
-    expression_df = expression_df.set_index('ModelID')
-
-# Dọn dẹp metadata rác
-meta_cols = ['SequencingID', 'IsDefaultEntryForModel', 'ModelConditionID', 'IsDefaultEntryForMC']
-cols_to_drop = [c for c in meta_cols if c in expression_df.columns]
-if cols_to_drop:
-    expression_df = expression_df.drop(columns=cols_to_drop)
-
-print(f"  Shape: {expression_df.shape} (samples x genes)")
-
-# Find target cell line sample
-print(f"\nSearching for target cell line: {cfg.TARGET_CELL_LINE} ({cfg.TARGET_CELL_LINE_MODEL_ID})")
-
-if cfg.TARGET_CELL_LINE_MODEL_ID in expression_df.index:
-    cell_line_expression = expression_df.loc[cfg.TARGET_CELL_LINE_MODEL_ID]
-    print(f"  Found {cfg.TARGET_CELL_LINE} by ModelID: {cfg.TARGET_CELL_LINE_MODEL_ID}")
-else:
-    raise ValueError(f"{cfg.TARGET_CELL_LINE} sample ({cfg.TARGET_CELL_LINE_MODEL_ID}) not found in expression data!")
-
-# Clean gene names (strip Entrez IDs if present)
-print("\nNormalizing gene names in expression data...")
-clean_gene_names = [g.split(' (')[0] for g in cell_line_expression.index]
-cell_line_expression.index = clean_gene_names
-
-# Normalize gene names (remove hyphens, uppercase)
-normalized_gene_names = [cfg.normalize_gene_name(g) for g in cell_line_expression.index]
-cell_line_expression.index = normalized_gene_names
-
-# Handle duplicates (take max expression)
-cell_line_expression = cell_line_expression.groupby(cell_line_expression.index).max()
-
-print(f"  Unique normalized genes: {len(cell_line_expression):,}")
-expression_dict = cell_line_expression.to_dict()
-
-# Expression distribution & Plotting
-print(f"\n{cfg.TARGET_CELL_LINE} Expression Distribution:")
-print(cell_line_expression.describe())
-
-fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-axes[0].hist(cell_line_expression.values, bins=50, color='steelblue', edgecolor='white', alpha=0.7)
-axes[0].set_xlabel('Expression Level')
-axes[0].set_ylabel('Frequency')
-axes[0].set_title(f'{cfg.TARGET_CELL_LINE} Gene Expression Distribution')
-axes[0].axvline(cell_line_expression.median(), color='red', linestyle='--', label=f'Median: {cell_line_expression.median():.2f}')
-axes[0].legend()
-
-log_expr = np.log10(cell_line_expression.values + 1)
-axes[1].hist(log_expr, bins=50, color='darkgreen', edgecolor='white', alpha=0.7)
-axes[1].set_xlabel('log10(Expression + 1)')
-axes[1].set_ylabel('Frequency')
-axes[1].set_title(f'{cfg.TARGET_CELL_LINE} Log-Transformed Expression')
-
-plt.tight_layout()
-plt.savefig(cfg.LAYER2B_OUTPUT_DIR / f"L2B_{cfg.TARGET_CELL_LINE}_Expression_Distribution.png", dpi=150, bbox_inches='tight')
-plt.show()
-
-print(f"\nSaved: L2B_{cfg.TARGET_CELL_LINE}_Expression_Distribution.png")
-
-## Stage 5: Assemble Heterogeneous Graph & P0 Calibration
-# Build the combined graph with:
-#- SCENIC edges: **Directed** (TF → Target) - respects DL6
-#- STRING edges: **Undirected** (protein <-> protein)
-# Then calibrate P0 vector using: $P_{0,i} = (CNN\_VS_i \times E_i) + \epsilon$
-
-# ============================================================
-# Stage 5: Assemble Heterogeneous Graph & P0 Calibration
-# ============================================================
-print("="*64)
-print("STAGE 5: ASSEMBLE HETEROGENEOUS GRAPH & P0 CALIBRATION")
-print("="*64)
-
-# Load Layer 1 P0 Vector
-L1_P0_PATH = cfg.LAYER1_OUTPUT_DIR / "L1_P0_Vector_Long.csv"
-print(f"Loading Layer 1 P0 Vector from: {L1_P0_PATH}")
-
-l1_p0_df = pd.read_csv(L1_P0_PATH)
-print(f"  Loaded {len(l1_p0_df):,} ligand-target pairs")
-print(f"  Columns: {list(l1_p0_df.columns)}")
-
-# Preview
-display(l1_p0_df.head())
-# Normalize target names in L1 P0 vector
-print("\nNormalizing target names...")
-l1_p0_df['target_normalized'] = l1_p0_df[cfg.COL_TARGET].apply(cfg.normalize_gene_name)
-
-# Check normalization
-print(f"  Original targets: {l1_p0_df[cfg.COL_TARGET].unique()}")
-print(f"  Normalized targets: {l1_p0_df['target_normalized'].unique()}")
-
-# Unique ligands
-unique_ligands = l1_p0_df[cfg.COL_LIGAND_ID].unique()
-print(f"\n  Unique ligands: {len(unique_ligands)}")
-# Create the heterogeneous graph
-# Using DiGraph because SCENIC edges are directed (TF -> Target)
-# STRING edges will be added in both directions
-print("\nBuilding heterogeneous graph...")
-
-G = nx.DiGraph()
-
-# Add SCENIC edges (if available) - DIRECTED: TF -> Target
-# DL6 COMPLIANCE: Using directed edges for transcriptional regulation
-# VECTORIZED: Using add_edges_from() instead of iterrows() for ~100x speedup
-if SCENIC_AVAILABLE and scenic_edges_df is not None:
-    print(f"  Adding SCENIC edges (directed, vectorized)...")
-    
-    # Get weight column (use default 1.0 if not present)
-    if cfg.COL_GRN_WEIGHT in scenic_edges_df.columns:
-        weights = scenic_edges_df[cfg.COL_GRN_WEIGHT].values
-    else:
-        weights = np.ones(len(scenic_edges_df))
-    
-    # Build edge list using list comprehension (vectorized)
-    scenic_edges = [
-        (src, tgt, {'weight': w, 'edge_type': cfg.EDGE_TYPE_SCENIC})
-        for src, tgt, w in zip(
-            scenic_edges_df['Source_Normalized'],
-            scenic_edges_df['Target_Normalized'],
-            weights
-        )
-    ]
-    G.add_edges_from(scenic_edges)
-    
-    # Validate directionality (DL6)
-    cfg.validate_deadlock_rules("directed_grn", is_directed=G.is_directed())
-    print(f"    Added {len(scenic_edges):,} SCENIC edges")
-else:
-    print("  SCENIC edges: Skipped (not available)")
-
-# Add STRING edges - BIDIRECTIONAL: protein <-> protein
-# VECTORIZED: Using add_edges_from() instead of iterrows() for ~100x speedup
-print(f"  Adding STRING PPI edges (bidirectional, vectorized)...")
-print(f"    Processing {len(string_ppi_mapped):,} edges...")
-
-# Build forward edges
-edges_fwd = [
-    (g1, g2, {'weight': s / 1000.0, 'edge_type': cfg.EDGE_TYPE_STRING})
-    for g1, g2, s in zip(
-        string_ppi_mapped['Gene1_Normalized'],
-        string_ppi_mapped['Gene2_Normalized'],
-        string_ppi_mapped['combined_score']
+if cfg.LAYER2_RUN_MODE != "TARGETED_LIONESS_MULTI_MODEL":
+    raise RuntimeError(
+        f"[M1] LAYER2_RUN_MODE must be 'TARGETED_LIONESS_MULTI_MODEL', "
+        f"got '{cfg.LAYER2_RUN_MODE}'. Update config_system.py."
     )
-]
-# Build reverse edges for bidirectionality
-edges_rev = [(g2, g1, attr) for g1, g2, attr in edges_fwd]
 
-# Add all edges at once
-G.add_edges_from(edges_fwd + edges_rev)
-string_edge_count = len(edges_fwd) + len(edges_rev)
+# DL2-23: separate log + gate report
+cfg.validate_deadlock_rules(
+    "dl2_23_split_provenance",
+    separate_logs=True,
+    separate_gate_reports=True,
+)
+print("[DL2-23] PASS — separate multi-model log + gate report")
 
-print(f"    Added {string_edge_count:,} STRING edges (bidirectional)")
+# DL2-26: target list declared + validated
+TARGET_MODELS_LIST = cfg.validate_target_models_list()
+cfg.validate_deadlock_rules(
+    "dl2_26_target_list_declared",
+    target_list_source="cfg.L2_TARGET_MODELS_LIST",
+    list_validated=True,
+)
+cfg.validate_deadlock_rules(
+    "dl2_24_target_input_declared",
+    target_model_input=cfg.L2_TARGET_MODEL_INPUT,
+    target_models_list=TARGET_MODELS_LIST,
+)
+print(f"[DL2-26] PASS — target list n={len(TARGET_MODELS_LIST)}")
+print(f"[DL2-24] PASS — multi-model list declared in config")
+logger.info(f"TARGET_MODELS_LIST (n={len(TARGET_MODELS_LIST)}): {TARGET_MODELS_LIST}")
 
-# Graph summary
-print(f"\nHeterogeneous Graph Summary:")
-print(f"  Nodes: {G.number_of_nodes():,}")
-print(f"  Edges: {G.number_of_edges():,}")
-print(f"  Is Directed: {G.is_directed()} (required for SCENIC edges)")
-# Edge type distribution
-edge_types = [d.get('edge_type', 'unknown') for _, _, d in G.edges(data=True)]
-edge_type_counts = pd.Series(edge_types).value_counts()
-print("\nEdge Type Distribution:")
-print(edge_type_counts)
 
-# Visualize
-plt.figure(figsize=(6, 4))
-edge_type_counts.plot(kind='bar', color=['#2ecc71', '#3498db'])
-plt.xlabel('Edge Type')
-plt.ylabel('Count')
-plt.title('Heterogeneous Graph Edge Distribution')
-plt.xticks(rotation=0)
-for i, v in enumerate(edge_type_counts):
-    plt.text(i, v + 1000, f'{v:,}', ha='center')
-plt.tight_layout()
-plt.savefig(cfg.LAYER2B_OUTPUT_DIR / "L2B_Edge_Type_Distribution.png", dpi=150, bbox_inches='tight')
-plt.show()
-# P0 Calibration: P0_raw_weight * Expression + epsilon
-# DL7 COMPLIANCE: Must multiply by expression level
-print("\n" + "="*64)
-print("P0 CALIBRATION")
-print("="*64)
-print(f"Formula: P0_i = (P0_raw_weight_i * E_i) + epsilon")
-print(f"  where P0_raw_weight = {cfg.ALPHA_CNN_VS_WEIGHT}*CNN_VS_norm + {cfg.ALPHA_AFFINITY_WEIGHT}*Affinity_norm")
-print(f"Epsilon (pseudo-count): {cfg.RWR_PSEUDO_COUNT}")
+# =============================================================================
+# HELPERS
+# =============================================================================
 
-def calibrate_p0_for_ligand(ligand_df, expression_dict, epsilon=cfg.RWR_PSEUDO_COUNT):
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _handle_missing(model_id: str, reason: str, ledger: list) -> None:
+    """Apply L2_MULTI_MODEL_ON_MISSING policy."""
+    policy = cfg.L2_MULTI_MODEL_ON_MISSING
+    entry = {
+        "model_id": model_id,
+        "status": "SKIPPED" if policy == "skip_missing_with_ledger" else "FAILED",
+        "reason": reason,
+        "lineage": None,
+        "timestamp": datetime.now().isoformat(),
+    }
+    ledger.append(entry)
+    msg = f"[MISSING] {model_id}: {reason} (policy={policy})"
+    if policy == "fail":
+        logger.error(msg)
+        raise RuntimeError(msg)
+    logger.warning(msg)
+    print(f"  [SKIP] {model_id}: {reason}")
+
+
+def _resolve_lioness_npy(
+    raw_dir: Path,
+    target_model_id: str,
+    target_pos_0based: int,
+    expected_shape: tuple,
+    context: str,
+) -> Path:
     """
-    Calibrate P0 vector for a single ligand.
-    
-    DL7 Compliance: P0 = (P0_raw_weight * Expression) + epsilon
-    
-    Args:
-        ligand_df: DataFrame with columns [target_normalized, P0_raw_weight]
-        expression_dict: Dict mapping gene -> expression level
-        epsilon: Pseudo-count to prevent zero-division
-    
-    Returns:
-        dict: Gene -> P0 weight (normalized to sum to 1)
+    Select the correct single-sample LIONESS .npy from netZooPy output.
+
+    netZooPy dual-write (when save_single=True and ignore_final=False):
+      1) save_single path in __lioness_loop:
+            lioness.{expression_samples[i]}.{i}.{fmt}
+         e.g. lioness.ACH-000019.41.npy  OR  lioness.1.0.npy
+         (sample name depends on whether expression sample labels survived)
+      2) save_lioness_results() at end of __init__ (ignore_final=False):
+            lioness.npy
+         This is the aggregated export table — NOT the preferred single-
+         sample TF×gene matrix for our labeling pipeline.
+
+    Integrity rule:
+      Prefer save_single patterned files whose array shape == PANDA network.
+      Never silently pick an arbitrary file when shapes disagree.
     """
-    p0_raw = {}
-    
-    for _, row in ligand_df.iterrows():
-        gene = row['target_normalized']
-        p0_raw_weight = row[cfg.COL_P0_RAW_WEIGHT]  # FIXED: Use composite score from Layer 1
-        
-        # Get expression level (default to epsilon if not found)
-        expr = expression_dict.get(gene, epsilon)
-        
-        # P0 = (P0_raw_weight * Expression) + epsilon
-        p0_weight = (p0_raw_weight * expr) + epsilon  # FIXED: Was using CNN_VS, now uses P0_raw_weight
-        p0_raw[gene] = p0_weight
-    
-    # Normalize to sum to 1
-    total = sum(p0_raw.values())
-    p0_normalized = {gene: weight / total for gene, weight in p0_raw.items()}
-    
-    return p0_normalized
-
-# Test calibration for first ligand
-test_ligand = unique_ligands[0]
-test_df = l1_p0_df[l1_p0_df[cfg.COL_LIGAND_ID] == test_ligand]
-test_p0 = calibrate_p0_for_ligand(test_df, expression_dict)
-
-print(f"\nTest P0 calibration for ligand: {test_ligand}")
-print(f"  Targets: {list(test_p0.keys())}")
-print(f"  P0 weights: {list(test_p0.values())}")
-print(f"  Sum: {sum(test_p0.values()):.6f} (should be ~1.0)")
-
-# Validate DL7 compliance
-cfg.validate_deadlock_rules("p0_calibration", multiplied_by_expression=True)
-print("\nDL7 Compliance: PASSED (P0 = P0_raw_weight * Expression)")
-
-## Stage 6: RWR Execution with NetworkX PageRank
-
-#Run Random Walk with Restart using `nx.pagerank()` with alpha=0.7 (restart probability).
-# ============================================================
-# Stage 6: RWR Execution
-# ============================================================
-print("="*64)
-print("STAGE 6: RWR EXECUTION")
-print("="*64)
-print(f"RWR Parameters:")
-print(f"  Alpha (restart probability): {cfg.RWR_ALPHA}")
-print(f"  Max iterations: {cfg.RWR_MAX_ITER}")
-print(f"  Convergence tolerance: {cfg.RWR_TOL}")
-
-def run_rwr(G, personalization, alpha=cfg.RWR_ALPHA, max_iter=cfg.RWR_MAX_ITER, tol=cfg.RWR_TOL):
-    """
-    Run Random Walk with Restart using NetworkX PageRank.
-    
-    NetworkX pagerank convention:
-        P_{t+1} = (1-alpha) * W^T * P_t + alpha * P_0
-        alpha = restart probability (return to seeds)
-    
-    Args:
-        G: NetworkX graph
-        personalization: Dict of seed node weights (P0 vector)
-        alpha: Restart probability (default 0.7)
-        max_iter: Maximum iterations
-        tol: Convergence tolerance
-    
-    Returns:
-        dict: Node -> RWR score
-    """
-    # Filter personalization to nodes in graph
-    p0_in_graph = {node: weight for node, weight in personalization.items() if node in G}
-    
-    if not p0_in_graph:
-        # No seed nodes in graph - return empty
-        return {}
-    
-    # Re-normalize after filtering
-    total = sum(p0_in_graph.values())
-    p0_normalized = {node: weight / total for node, weight in p0_in_graph.items()}
-    
-    try:
-        rwr_scores = nx.pagerank(
-            G,
-            alpha=alpha,
-            personalization=p0_normalized,
-            max_iter=max_iter,
-            tol=tol,
-            weight='weight'
+    raw_dir = Path(raw_dir)
+    npy_files = sorted(raw_dir.glob("*.npy"))
+    if not npy_files:
+        raise RuntimeError(
+            f"[{context}] No .npy files in {raw_dir}. "
+            "LIONESS did not write output (check save_dir / save_single)."
         )
-        return rwr_scores
-    except Exception as e:
-        print(f"    WARNING: RWR failed - {e}")
-        return {}
-# Run RWR for all ligands
-print(f"\nRunning RWR for {len(unique_ligands)} ligands...")
 
-# Runtime estimate: ~5-15 seconds per PageRank call on 100k+ node graph
-n_nodes = G.number_of_nodes()
-n_edges = G.number_of_edges()
-n_ligands = len(unique_ligands)
-est_time_per_call = 0.1 if n_nodes < 10000 else (0.5 if n_nodes < 50000 else 5.0)
-est_total_minutes = (n_ligands * est_time_per_call) / 60
+    # Priority 1: exact save_single pattern with ModelID + 0-based index
+    #   lioness.{sample}.{i}.npy
+    candidates_ranked: list[Path] = []
+    pat_model_idx = (
+        f"lioness.{target_model_id}.{target_pos_0based}.npy"
+    )
+    p = raw_dir / pat_model_idx
+    if p.exists():
+        candidates_ranked.append(p)
 
-print(f"\n*** RUNTIME ESTIMATE ***")
-print(f"  Graph size: {n_nodes:,} nodes, {n_edges:,} edges")
-print(f"  Ligands to process: {n_ligands}")
-print(f"  Estimated time per RWR: ~{est_time_per_call:.1f} seconds")
-print(f"  Estimated total time: ~{est_total_minutes:.1f} minutes")
-print(f"************************\n")
+    # Priority 2: any lioness.{something}.{i}.npy with matching index
+    #   (netZooPy may use integer sample labels if headerless expr had no names)
+    for p in npy_files:
+        name = p.name
+        if name == "lioness.npy":
+            continue  # aggregate export — deprioritize
+        # lioness.<sample>.<idx>.npy
+        parts = name.split(".")
+        # ['lioness', sample..., idx, 'npy'] — sample may contain dots rarely
+        if len(parts) >= 4 and parts[0] == "lioness" and parts[-1] == "npy":
+            idx_token = parts[-2]
+            if idx_token.isdigit() and int(idx_token) == int(target_pos_0based):
+                if p not in candidates_ranked:
+                    candidates_ranked.append(p)
 
-rwr_results = {}
-from tqdm.auto import tqdm # Thêm dòng này ở đầu cell nếu chưa có
-for ligand_id in tqdm(unique_ligands, desc="RWR per ligand"):
-    # Get ligand-specific targets
-    ligand_df = l1_p0_df[l1_p0_df[cfg.COL_LIGAND_ID] == ligand_id]
-    
-    # Calibrate P0
-    p0 = calibrate_p0_for_ligand(ligand_df, expression_dict)
-    
-    # Run RWR
-    rwr_scores = run_rwr(G, p0)
-    
-    # Store results
-    rwr_results[ligand_id] = {
-        'p0': p0,
-        'rwr_scores': rwr_scores,
-        'n_seeds': len(p0),
-        'n_seeds_in_graph': len([n for n in p0 if n in G])
-    }
+    # Priority 3: any non-aggregate lioness.*.npy
+    for p in npy_files:
+        if p.name != "lioness.npy" and p not in candidates_ranked:
+            candidates_ranked.append(p)
 
-print(f"\nRWR completed for {len(rwr_results)} ligands.")
-# Summarize RWR results
-print("\nRWR Results Summary:")
-seeds_in_graph = [r['n_seeds_in_graph'] for r in rwr_results.values()]
-print(f"  Ligands processed: {len(rwr_results)}")
-print(f"  Seeds in graph: {np.mean(seeds_in_graph):.1f} average per ligand")
+    # Priority 4: aggregate lioness.npy last (only if shape matches)
+    agg = raw_dir / "lioness.npy"
+    if agg.exists() and agg not in candidates_ranked:
+        candidates_ranked.append(agg)
 
-# Check coverage
-ligands_with_results = [lid for lid, r in rwr_results.items() if len(r['rwr_scores']) > 0]
-print(f"  Ligands with RWR scores: {len(ligands_with_results)}")
+    shape_ok = []
+    shape_bad = []
+    for p in candidates_ranked:
+        try:
+            arr = np.load(str(p), mmap_mode="r")
+            shp = tuple(arr.shape)
+        except Exception as e:
+            shape_bad.append((p.name, f"load_error:{e}"))
+            continue
+        if shp == tuple(expected_shape):
+            shape_ok.append((p, shp))
+        else:
+            shape_bad.append((p.name, shp))
 
-# Preview top genes for first ligand
-test_ligand = ligands_with_results[0]
-test_scores = rwr_results[test_ligand]['rwr_scores']
-top_10 = sorted(test_scores.items(), key=lambda x: x[1], reverse=True)[:10]
+    if shape_ok:
+        chosen, shp = shape_ok[0]
+        if len(npy_files) > 1:
+            logger.info(
+                f"[{context}] netZooPy wrote {len(npy_files)} .npy files "
+                f"{[p.name for p in npy_files]}; selected '{chosen.name}' "
+                f"shape={shp} (PANDA-matched). "
+                f"Rejected/other: {shape_bad}"
+            )
+            print(
+                f"    npy select    : {chosen.name} "
+                f"(from {len(npy_files)} files; shape OK {shp})"
+            )
+        return chosen
 
-print(f"\nTop 10 genes for {test_ligand}:")
-for gene, score in top_10:
-    is_seed = "(SEED)" if gene in rwr_results[test_ligand]['p0'] else ""
-    print(f"  {gene}: {score:.6f} {is_seed}")
-
-## Stage 7: Delta-Network Analysis
-
-#Compare High-Affinity vs Low-Affinity compounds to identify drug-specific hubs.  
-#**DL8 Compliance**: Must compare High-Affinity vs Low-Affinity (cannot conclude MoA from single compound).
-
-# $$Delta\_Score_i = \bar{RWR}_{HighAffinity,i} - \bar{RWR}_{LowAffinity,i}$$
-# ============================================================
-# Stage 7: Delta-Network Analysis
-# ============================================================
-print("="*64)
-print("STAGE 7: DELTA-NETWORK ANALYSIS")
-print("="*64)
-print(f"High-Affinity threshold: Top {100-cfg.ACTIVE_PERCENTILE}% by CNN_VS (percentile {cfg.ACTIVE_PERCENTILE})")
-print(f"Low-Affinity threshold: Bottom {cfg.INACTIVE_PERCENTILE}% by CNN_VS (percentile {cfg.INACTIVE_PERCENTILE})")
-
-# Calculate mean CNN_VS per ligand (across all targets)
-ligand_mean_cnn_vs = l1_p0_df.groupby(cfg.COL_LIGAND_ID)[cfg.COL_CNN_VS].mean()
-
-# Define thresholds
-high_affinity_threshold = np.percentile(ligand_mean_cnn_vs, cfg.ACTIVE_PERCENTILE)
-low_affinity_threshold = np.percentile(ligand_mean_cnn_vs, cfg.INACTIVE_PERCENTILE)
-
-print(f"\nCNN_VS Thresholds:")
-print(f"  High-Affinity (>= {high_affinity_threshold:.4f}): Top {100-cfg.ACTIVE_PERCENTILE}%")
-print(f"  Low-Affinity (<= {low_affinity_threshold:.4f}): Bottom {cfg.INACTIVE_PERCENTILE}%")
-
-# Classify ligands
-high_affinity_ligands = ligand_mean_cnn_vs[ligand_mean_cnn_vs >= high_affinity_threshold].index.tolist()
-low_affinity_ligands = ligand_mean_cnn_vs[ligand_mean_cnn_vs <= low_affinity_threshold].index.tolist()
-
-print(f"\nLigand Affinity Classification (by CNN_VS):")
-print(f"  High-affinity ligands: {len(high_affinity_ligands)}")
-print(f"  Low-affinity ligands: {len(low_affinity_ligands)}")
-# Calculate average RWR scores for Active and Inactive groups
-print("\nCalculating average RWR scores per group...")
-
-def get_mean_rwr_scores(ligand_list, rwr_results):
-    """Calculate mean RWR scores across a set of ligands."""
-    all_genes = set()
-    for lid in ligand_list:
-        if lid in rwr_results:
-            all_genes.update(rwr_results[lid]['rwr_scores'].keys())
-    
-    mean_scores = {}
-    for gene in all_genes:
-        scores = []
-        for lid in ligand_list:
-            if lid in rwr_results and gene in rwr_results[lid]['rwr_scores']:
-                scores.append(rwr_results[lid]['rwr_scores'][gene])
-        if scores:
-            mean_scores[gene] = np.mean(scores)
-    
-    return mean_scores
-
-high_affinity_mean_rwr = get_mean_rwr_scores(high_affinity_ligands, rwr_results)
-low_affinity_mean_rwr = get_mean_rwr_scores(low_affinity_ligands, rwr_results)
-
-print(f"  High-affinity group - genes with scores: {len(high_affinity_mean_rwr):,}")
-print(f"  Low-affinity group - genes with scores: {len(low_affinity_mean_rwr):,}")
-# Calculate Delta Score: Active - Inactive
-print("\nCalculating Delta Scores...")
-
-all_genes = set(high_affinity_mean_rwr.keys()) | set(low_affinity_mean_rwr.keys())
-delta_scores = {}
-
-for gene in all_genes:
-    high_affinity_score = high_affinity_mean_rwr.get(gene, 0)
-    low_affinity_score = low_affinity_mean_rwr.get(gene, 0)
-    delta_scores[gene] = high_affinity_score - low_affinity_score
-
-# Create DataFrame
-delta_df = pd.DataFrame([
-    {
-        cfg.COL_GENE: gene,
-        'RWR_HighAffinity': high_affinity_mean_rwr.get(gene, 0),
-        'RWR_LowAffinity': low_affinity_mean_rwr.get(gene, 0),
-        cfg.COL_DELTA_SCORE: delta_scores[gene]
-    }
-    for gene in all_genes
-])
-
-# Sort by absolute delta score
-delta_df['Delta_Abs'] = delta_df[cfg.COL_DELTA_SCORE].abs()
-delta_df = delta_df.sort_values('Delta_Abs', ascending=False)
-
-print(f"  Total genes analyzed: {len(delta_df):,}")
-
-# Mark direct targets
-direct_targets = set(l1_p0_df['target_normalized'].unique())
-delta_df[cfg.COL_IS_DIRECT_TARGET] = delta_df[cfg.COL_GENE].isin(direct_targets)
-
-print(f"  Direct targets: {delta_df[cfg.COL_IS_DIRECT_TARGET].sum()}")
-
-# Preview
-print("\nTop 20 genes by |Delta Score|:")
-display(delta_df.head(20))
-# Validate DL8 compliance
-cfg.validate_deadlock_rules("delta_network", compared_active_inactive=True)
-print("DL8 Compliance: PASSED (High-Affinity vs Low-Affinity comparison completed)")
-# Visualize Delta Score distribution
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-# Histogram
-axes[0].hist(delta_df[cfg.COL_DELTA_SCORE], bins=50, color='purple', alpha=0.7, edgecolor='white')
-axes[0].axvline(0, color='red', linestyle='--', label='Zero (no difference)')
-axes[0].set_xlabel('Delta Score (High-Affinity - Low-Affinity)')
-axes[0].set_ylabel('Frequency')
-axes[0].set_title('Delta Score Distribution')
-axes[0].legend()
-
-# Scatter: Active vs Inactive
-colors = ['red' if dt else 'gray' for dt in delta_df[cfg.COL_IS_DIRECT_TARGET]]
-axes[1].scatter(delta_df['RWR_LowAffinity'], delta_df['RWR_HighAffinity'], c=colors, alpha=0.5, s=10)
-axes[1].plot([0, delta_df['RWR_HighAffinity'].max()], [0, delta_df['RWR_HighAffinity'].max()], 'k--', alpha=0.5, label='y=x')
-axes[1].set_xlabel('Mean RWR Score (Low-Affinity Compounds)')
-axes[1].set_ylabel('Mean RWR Score (High-Affinity Compounds)')
-axes[1].set_title('High-Affinity vs Low-Affinity RWR Scores')
-axes[1].legend(['y=x line', 'Direct targets (red)', 'Other genes (gray)'])
-
-plt.tight_layout()
-plt.savefig(cfg.LAYER2B_OUTPUT_DIR / "L2B_Delta_Network_Analysis.png", dpi=150, bbox_inches='tight')
-plt.show()
-
-print(f"\nSaved: L2B_Delta_Network_Analysis.png")
-# Save Delta Network Summary
-delta_output_path = cfg.LAYER2B_OUTPUT_DIR / cfg.L2B_DELTA_NETWORK_CSV
-delta_df.to_csv(delta_output_path, index=False)
-print(f"Saved: {delta_output_path}")
-
-# ============================================================
-# STAGE 7B: SENSITIVITY ANALYSIS (Cut-off Robustness Check)
-# ============================================================
-# Purpose: Demonstrate that Delta-Network hubs are stable across
-# different percentile cut-offs (5%, 10%, 15%, 20%), addressing
-# reviewer concerns about arbitrary threshold selection.
-#
-# TERMINOLOGY NOTE: We use 'High-Affinity' / 'Low-Affinity' to describe
-# compound groups based on PREDICTED binding scores (CNN_VS), NOT
-# experimental biological activity (IC50/EC50).
-
-print("="*64)
-print("STAGE 7B: SENSITIVITY ANALYSIS (Cut-off Robustness)")
-print("="*64)
-print("Testing stability of Top 50 Hub Genes across percentile thresholds...")
-print("NOTE: Groups defined by PREDICTED binding affinity (CNN_VS), not experimental activity.")
-
-cutoffs = [5, 10, 15, 20]
-top_n_genes = 50
-
-def get_delta_for_cutoff(percentile):
-    """Calculate Delta Network top genes for a given percentile cut-off."""
-    act_thresh = np.percentile(ligand_mean_cnn_vs, 100 - percentile)
-    inact_thresh = np.percentile(ligand_mean_cnn_vs, percentile)
-    
-    act_ligands = ligand_mean_cnn_vs[ligand_mean_cnn_vs >= act_thresh].index.tolist()
-    inact_ligands = ligand_mean_cnn_vs[ligand_mean_cnn_vs <= inact_thresh].index.tolist()
-    
-    act_rwr = get_mean_rwr_scores(act_ligands, rwr_results)
-    inact_rwr = get_mean_rwr_scores(inact_ligands, rwr_results)
-    
-    delta_scores_local = {}
-    for gene in set(act_rwr.keys()) | set(inact_rwr.keys()):
-        delta_scores_local[gene] = act_rwr.get(gene, 0) - inact_rwr.get(gene, 0)
-    
-    sorted_genes = sorted(delta_scores_local.items(), key=lambda x: abs(x[1]), reverse=True)
-    return [g[0] for g in sorted_genes[:top_n_genes]]
-
-# Baseline: 10% cut-off (our default)
-baseline_genes = set(get_delta_for_cutoff(10))
-
-# Run sensitivity analysis across all cut-offs
-stability_metrics = []
-for p in cutoffs:
-    test_genes = set(get_delta_for_cutoff(p))
-    
-    intersection = len(baseline_genes.intersection(test_genes))
-    union = len(baseline_genes.union(test_genes))
-    jaccard = intersection / union if union > 0 else 0
-    overlap_pct = (intersection / top_n_genes) * 100
-    
-    n_compounds = int(len(ligand_mean_cnn_vs) * p / 100)
-    
-    stability_metrics.append({
-        'Cutoff_Percentile': p,
-        'N_Compounds_Per_Group': n_compounds,
-        'Overlap_With_Baseline_Pct': round(overlap_pct, 1),
-        'Jaccard_Index': round(jaccard, 3)
-    })
-
-sensitivity_df = pd.DataFrame(stability_metrics)
-print("\nSensitivity Analysis Results (Baseline = 10% cut-off):")
-display(sensitivity_df)
-
-# Visualize stability
-fig, ax = plt.subplots(figsize=(8, 5))
-ax.plot(sensitivity_df['Cutoff_Percentile'], sensitivity_df['Overlap_With_Baseline_Pct'], 
-        marker='o', linewidth=2, color='darkred', markersize=10, label='Overlap %')
-ax.axvline(x=10, color='gray', linestyle='--', alpha=0.7, label='Baseline (10%)')
-ax.axhline(y=80, color='green', linestyle=':', alpha=0.5, label='80% stability threshold')
-ax.set_ylim(0, 105)
-ax.set_xlim(0, 25)
-ax.set_xlabel('Cut-off Percentile (%)', fontsize=12)
-ax.set_ylabel('Top 50 Genes Overlap with Baseline (%)', fontsize=12)
-ax.set_title('Sensitivity Analysis: Delta-Network Hub Stability\n(Robustness to Percentile Threshold Selection)', fontsize=12)
-ax.legend(loc='lower right')
-ax.grid(True, alpha=0.3)
-
-# Annotate points
-for _, row in sensitivity_df.iterrows():
-    ax.annotate(f"{row['Overlap_With_Baseline_Pct']:.0f}%", 
-                xy=(row['Cutoff_Percentile'], row['Overlap_With_Baseline_Pct']),
-                xytext=(5, 10), textcoords='offset points', fontsize=10)
-
-plt.tight_layout()
-sensitivity_plot_path = cfg.LAYER2B_OUTPUT_DIR / "L2B_Sensitivity_Analysis.png"
-plt.savefig(sensitivity_plot_path, dpi=150, bbox_inches='tight')
-plt.show()
-print(f"\nSaved plot: {sensitivity_plot_path}")
-
-# Save sensitivity results to CSV
-sensitivity_csv_path = cfg.LAYER2B_OUTPUT_DIR / "L2B_Sensitivity_Analysis.csv"
-sensitivity_df.to_csv(sensitivity_csv_path, index=False)
-print(f"Saved data: {sensitivity_csv_path}")
-
-# Summary interpretation
-min_overlap = sensitivity_df['Overlap_With_Baseline_Pct'].min()
-if min_overlap >= 80:
-    print(f"\n*** SENSITIVITY ANALYSIS PASSED ***")
-    print(f"Minimum overlap across cut-offs: {min_overlap:.1f}% (>= 80% threshold)")
-    print("Delta-Network hubs are ROBUST to percentile threshold selection.")
-else:
-    print(f"\n*** SENSITIVITY ANALYSIS WARNING ***")
-    print(f"Minimum overlap: {min_overlap:.1f}% (< 80% threshold)")
-    print("Consider investigating hub stability further.")
+    raise RuntimeError(
+        f"[{context}] Could not resolve single-sample LIONESS .npy with "
+        f"shape={expected_shape}. Found files: "
+        f"{[p.name for p in npy_files]}. Shape report: {shape_bad}. "
+        f"Hint: prefer lioness.<sample>.<0based_index>.npy from save_single; "
+        f"lioness.npy is often the aggregate export and may differ in shape."
+    )
 
 
-## Stage 8: Export Top 50 Hub Genes per Ligand
+# =============================================================================
+# STAGE M2: LOAD FOUNDATION MANIFEST & VALIDATE CONTRACT
+# =============================================================================
 
-#Extract and save top hub genes for each ligand, plus master summary file.
-# ============================================================
-# Stage 8: Export Top 50 Hub Genes per Ligand
-# ============================================================
-print("="*64)
-print("STAGE 8: EXPORT TOP 50 HUB GENES")
-print("="*64)
+print("\n" + "=" * 64)
+print("STAGE M2: LOAD FOUNDATION MANIFEST & VALIDATE CONTRACT")
+print("=" * 64)
+logger.info("Stage M2 start")
 
-TOP_N = cfg.L2B_TOP_HUB_GENES
-print(f"Extracting top {TOP_N} hub genes per ligand...")
+manifest_path = cfg.L2A_FROZEN_INPUTS_DIR / cfg.L2A_FOUNDATION_MANIFEST_JSON
+if not manifest_path.exists():
+    raise FileNotFoundError(
+        f"[M2] Foundation manifest missing: {manifest_path}\n"
+        f"Run notebook {cfg.LAYER2_NOTEBOOK_02A_NAME} (Stage 8F) first."
+    )
 
-master_hub_genes = []
+with open(manifest_path, "r", encoding="utf-8") as fh:
+    foundation = json.load(fh)
 
-for ligand_id in tqdm(unique_ligands, desc="Exporting hub genes"):
-    if ligand_id not in rwr_results or not rwr_results[ligand_id]['rwr_scores']:
+print(f"Manifest version : {foundation.get('manifest_version')}")
+print(f"Pipeline version : {foundation.get('pipeline_version')}")
+print(f"Config version   : {foundation.get('config_version')}")
+print(f"Lineages frozen  : {foundation.get('lineages_frozen')}")
+print(f"PANDA mode       : {foundation.get('panda_mode')}")
+print(f"PANDA alpha      : {foundation.get('panda_alpha')}")
+
+if foundation.get("manifest_version") != cfg.FOUNDATION_MANIFEST_VERSION:
+    raise RuntimeError(
+        f"[M2] Foundation manifest version mismatch: "
+        f"found='{foundation.get('manifest_version')}', "
+        f"expected='{cfg.FOUNDATION_MANIFEST_VERSION}'"
+    )
+
+logger.info(
+    f"[M2] Foundation manifest loaded | "
+    f"version={foundation.get('manifest_version')} | "
+    f"lineages={foundation.get('lineages_frozen')}"
+)
+
+# Validate all frozen lineage files exist
+print()
+for lineage in foundation["lineages_frozen"]:
+    arts = foundation["lineage_artifacts"][lineage]
+    for key, desc in [
+        ("expr_parquet", "expression parquet"),
+        ("sample_order_json", "sample order"),
+        ("genes_post_qc_json", "genes post-QC"),
+    ]:
+        p = cfg.LAYER2_GRN_OUTPUT_DIR / arts[key]
+        if not p.exists():
+            raise FileNotFoundError(
+                f"[M2] Missing frozen artifact for '{lineage}' ({desc}): {p}"
+            )
+    print(f"  [✓] {lineage:<12}: all frozen artifacts present")
+
+# Validate + verify prior file SHA-256 hashes
+print()
+prior_info = foundation["prior_files"]
+for path_key, hash_key, desc in [
+    ("motif_prior_path", "motif_prior_sha256", "motif prior"),
+    ("ppi_prior_path", "ppi_prior_sha256", "PPI prior"),
+]:
+    path = Path(prior_info[path_key])
+    if not path.exists():
+        raise FileNotFoundError(f"[M2] Prior file missing: {path}")
+    if foundation["prior_files"].get("hash_validation_required", True):
+        expected = prior_info[hash_key]
+        actual = _sha256_file(path)
+        if actual != expected:
+            raise RuntimeError(
+                f"[M2] SHA-256 mismatch for {desc}: {path.name}\n"
+                f"  Expected : {expected}\n"
+                f"  Actual   : {actual}\n"
+                "Prior files were modified since 02A ran."
+            )
+        print(f"  [✓] {path.name}: SHA-256 verified")
+    else:
+        print(f"  [i] {path.name}: hash validation disabled in manifest")
+
+# Load Model.csv (for target resolution only)
+print()
+model_df = pd.read_csv(cfg.CCLE_MODEL_CSV)
+n_rows = len(model_df)
+if cfg.COL_MODEL_ID not in model_df.columns:
+    raise RuntimeError(f"[M2] Model.csv missing '{cfg.COL_MODEL_ID}' column")
+if cfg.COL_ONCOTREE_LINEAGE not in model_df.columns:
+    raise RuntimeError(
+        f"[M2] Model.csv missing '{cfg.COL_ONCOTREE_LINEAGE}' column"
+    )
+print(f"  Model.csv loaded : {n_rows} rows")
+logger.info(f"[M2] Model.csv: {n_rows} rows")
+logger.info("Stage M2 complete")
+
+
+# =============================================================================
+# STAGE M3: RESOLVE ALL TARGETS → LINEAGE GROUPS
+# =============================================================================
+
+print("\n" + "=" * 64)
+print("STAGE M3: RESOLVE ALL TARGETS → LINEAGE GROUPS")
+print("=" * 64)
+logger.info("Stage M3 start")
+
+run_ledger: list = []  # full DL2-28 ledger entries
+# lineage -> OrderedDict of model_id -> metadata
+lineage_groups: dict = defaultdict(OrderedDict)
+resolution_rows = []
+
+for raw in TARGET_MODELS_LIST:
+    model_id = cfg.resolve_model_id(raw)
+    hits = model_df[
+        model_df[cfg.COL_MODEL_ID].astype(str).str.strip() == model_id
+    ].copy()
+
+    if len(hits) == 0:
+        _handle_missing(
+            model_id,
+            "not found in Model.csv",
+            run_ledger,
+        )
+        resolution_rows.append(
+            {
+                "raw_input": raw,
+                "model_id": model_id,
+                "lineage": None,
+                "status": "SKIPPED_OR_FAILED",
+                "reason": "not found in Model.csv",
+            }
+        )
         continue
-    
-    scores = rwr_results[ligand_id]['rwr_scores']
-    p0 = rwr_results[ligand_id]['p0']
-    
-    # Sort by RWR score
-    sorted_genes = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:TOP_N]
-    
-    # Create DataFrame for this ligand
-    ligand_hub_df = pd.DataFrame([
+
+    if len(hits) > 1:
+        # Ambiguous — always hard fail (integrity)
+        raise RuntimeError(
+            f"[M3] Target '{raw}' → '{model_id}' matches {len(hits)} rows "
+            f"in Model.csv — ambiguous."
+        )
+
+    # DL2-14 per resolved unique hit
+    cfg.validate_deadlock_rules(
+        "dl2_14_target_model", target_exists_uniquely=True
+    )
+
+    lineage = str(hits.iloc[0][cfg.COL_ONCOTREE_LINEAGE]).strip()
+    if lineage in ("", "Unknown", "nan"):
+        _handle_missing(
+            model_id,
+            f"invalid lineage metadata: {lineage!r}",
+            run_ledger,
+        )
+        resolution_rows.append(
+            {
+                "raw_input": raw,
+                "model_id": model_id,
+                "lineage": lineage,
+                "status": "SKIPPED_OR_FAILED",
+                "reason": f"invalid lineage: {lineage!r}",
+            }
+        )
+        continue
+
+    # DL2-15: lineage from Model.csv only
+    cfg.validate_deadlock_rules(
+        "dl2_15_lineage_from_metadata", lineage_from_metadata=True
+    )
+
+    if lineage not in foundation["lineages_frozen"]:
+        _handle_missing(
+            model_id,
+            f"lineage '{lineage}' not in 02A frozen set "
+            f"{foundation['lineages_frozen']}",
+            run_ledger,
+        )
+        resolution_rows.append(
+            {
+                "raw_input": raw,
+                "model_id": model_id,
+                "lineage": lineage,
+                "status": "SKIPPED_OR_FAILED",
+                "reason": f"lineage '{lineage}' not frozen in 02A",
+            }
+        )
+        continue
+
+    if model_id in lineage_groups[lineage]:
+        # Same ACH listed twice after alias resolution
+        raise RuntimeError(
+            f"[M3] Duplicate resolved ModelID '{model_id}' in target list "
+            f"(raw inputs include '{raw}')."
+        )
+
+    lineage_groups[lineage][model_id] = {
+        "raw_input": raw,
+        "model_id": model_id,
+        "lineage": lineage,
+    }
+    resolution_rows.append(
         {
-            cfg.COL_LIGAND_ID: ligand_id,
-            cfg.COL_GENE: gene,
-            cfg.COL_RWR_SCORE: score,
-            cfg.COL_RWR_RANK: rank + 1,
-            cfg.COL_IS_DIRECT_TARGET: gene in direct_targets,
-            'Is_Seed': gene in p0
+            "raw_input": raw,
+            "model_id": model_id,
+            "lineage": lineage,
+            "status": "QUEUED",
+            "reason": "",
         }
-        for rank, (gene, score) in enumerate(sorted_genes)
-    ])
-    
-    # Save individual file
-    individual_path = cfg.LAYER2B_OUTPUT_DIR / cfg.L2B_HUB_GENES_CSV.format(ligand_id=ligand_id)
-    ligand_hub_df.to_csv(individual_path, index=False)
-    
-    # Add to master list
-    master_hub_genes.append(ligand_hub_df)
+    )
 
-print(f"  Exported {len(master_hub_genes)} individual hub gene files")
-# Create master hub genes file
-if master_hub_genes:
-    master_hub_df = pd.concat(master_hub_genes, ignore_index=True)
-    master_path = cfg.LAYER2B_OUTPUT_DIR / cfg.L2B_MASTER_RWR_CSV
-    master_hub_df.to_csv(master_path, index=False)
-    print(f"\nSaved master hub genes: {master_path}")
-    print(f"  Total records: {len(master_hub_df):,}")
-    
-    # Summary
-    print(f"\nMaster Hub Genes Summary:")
-    print(f"  Unique ligands: {master_hub_df[cfg.COL_LIGAND_ID].nunique()}")
-    print(f"  Unique genes: {master_hub_df[cfg.COL_GENE].nunique()}")
-    print(f"  Direct targets in top {TOP_N}: {master_hub_df[cfg.COL_IS_DIRECT_TARGET].sum()}")
-# Save graph statistics
-# Safety check: edge_type_counts may not exist if Stage 5 edge type cell was skipped
-try:
-    scenic_edge_count = edge_type_counts.get(cfg.EDGE_TYPE_SCENIC, 0)
-    string_edge_count_stats = edge_type_counts.get(cfg.EDGE_TYPE_STRING, 0)
-except NameError:
-    # Recalculate from graph if edge_type_counts not defined
-    print("  Note: Recalculating edge type counts from graph...")
-    edge_types_recalc = [d.get('edge_type', 'unknown') for _, _, d in G.edges(data=True)]
-    edge_type_counts = pd.Series(edge_types_recalc).value_counts()
-    scenic_edge_count = edge_type_counts.get(cfg.EDGE_TYPE_SCENIC, 0)
-    string_edge_count_stats = edge_type_counts.get(cfg.EDGE_TYPE_STRING, 0)
+print("\nResolution summary by lineage:")
+for lin, models in lineage_groups.items():
+    print(f"  {lin:<12}: {len(models)} targets")
+    logger.info(f"[M3] lineage={lin} n_targets={len(models)} ids={list(models)}")
 
-graph_stats = {
-    'n_nodes': G.number_of_nodes(),
-    'n_edges': G.number_of_edges(),
-    'is_directed': G.is_directed(),
-    'n_scenic_edges': scenic_edge_count,
-    'n_string_edges': string_edge_count_stats,
-    'scenic_available': SCENIC_AVAILABLE,
-    'rwr_alpha': cfg.RWR_ALPHA,
-    'rwr_pseudo_count': cfg.RWR_PSEUDO_COUNT,
-    'string_min_confidence': cfg.STRING_MIN_CONFIDENCE,
-    'target_cell_line': cfg.TARGET_CELL_LINE,
-    'n_ligands_processed': len(rwr_results),
-    'n_high_affinity_ligands': len(high_affinity_ligands),
-    'n_low_affinity_ligands': len(low_affinity_ligands),
-    'pipeline_timestamp': PIPELINE_START.isoformat()
+n_queued = sum(len(v) for v in lineage_groups.values())
+n_ledger_early = len(run_ledger)
+print(f"\n  Queued for LIONESS : {n_queued}")
+print(f"  Early SKIP/FAIL    : {n_ledger_early}")
+logger.info(
+    f"[M3] queued={n_queued} early_skip_or_fail={n_ledger_early}"
+)
+
+if n_queued == 0:
+    raise RuntimeError(
+        "[M3] No targets remain after resolution against Model.csv + "
+        "frozen lineages. Aborting."
+    )
+
+# DL2-22 confirmed globally (no SNAIL, frozen only)
+cfg.validate_deadlock_rules(
+    "dl2_22_frozen_foundation_inputs",
+    using_frozen_foundation_inputs=True,
+    snail_recomputed=False,
+)
+print("[DL2-22] PASS — frozen foundation inputs only; no SNAIL recompute")
+logger.info("Stage M3 complete")
+
+
+# =============================================================================
+# STAGE M4: LOAD & CANONICALIZE PRIORS (once, shared)
+# =============================================================================
+
+print("\n" + "=" * 64)
+print("STAGE M4: LOAD & VERIFY PRIORS (shared across all lineages)")
+print("=" * 64)
+logger.info("Stage M4 start")
+
+local_motif = Path(foundation["prior_files"]["motif_prior_path"])
+local_ppi = Path(foundation["prior_files"]["ppi_prior_path"])
+
+motif_prior_df = pd.read_csv(local_motif, sep="\t", header=None)
+assert not motif_prior_df.empty, "[M4] Motif prior is empty"
+assert motif_prior_df.shape[1] >= 3, (
+    f"[M4] Motif prior needs >= 3 columns, got {motif_prior_df.shape[1]}"
+)
+motif_prior_df = motif_prior_df.iloc[:, :3].copy()
+motif_prior_df.columns = ["TF", "Gene", "Weight"]
+motif_prior_df["TF"] = motif_prior_df["TF"].astype(str).str.strip()
+motif_prior_df["Gene"] = motif_prior_df["Gene"].astype(str).str.strip()
+motif_prior_df["Weight"] = pd.to_numeric(
+    motif_prior_df["Weight"], errors="coerce"
+).fillna(1.0)
+
+ppi_prior_raw = pd.read_csv(local_ppi, sep="\t", header=None)
+assert not ppi_prior_raw.empty, "[M4] PPI prior is empty"
+assert ppi_prior_raw.shape[1] >= 2, (
+    f"[M4] PPI prior needs >= 2 columns, got {ppi_prior_raw.shape[1]}"
+)
+if ppi_prior_raw.shape[1] == 2:
+    ppi_prior_raw[2] = 1
+    ppi_prior_runtime_weight_mode = "canonicalized_binary_weight_1"
+    logger.warning(
+        "[M4] PPI prior: 2-column file canonicalized to 3-column (Weight=1). "
+        "File-format normalization for PANDA API. "
+        "Rebuild ppi_prior.txt as 3-column to eliminate this step."
+    )
+else:
+    ppi_prior_runtime_weight_mode = "native_3col"
+
+ppi_prior_df = ppi_prior_raw.iloc[:, :3].copy()
+ppi_prior_df.columns = ["TF1", "TF2", "Weight"]
+ppi_prior_df["TF1"] = ppi_prior_df["TF1"].astype(str).str.strip()
+ppi_prior_df["TF2"] = ppi_prior_df["TF2"].astype(str).str.strip()
+ppi_prior_df["Weight"] = pd.to_numeric(
+    ppi_prior_df["Weight"], errors="coerce"
+).fillna(1.0)
+
+n_self = int((ppi_prior_df["TF1"] == ppi_prior_df["TF2"]).sum())
+if n_self > 0:
+    ppi_prior_df = ppi_prior_df[
+        ppi_prior_df["TF1"] != ppi_prior_df["TF2"]
+    ].copy()
+    logger.warning(f"[M4] PPI prior: removed {n_self} self-loop edges")
+
+cfg.validate_deadlock_rules(
+    "dl2_05_prior_source", prior_source_runtime="LOCAL_FILES"
+)
+print(f"Motif prior : {motif_prior_df.shape}")
+print(f"PPI prior   : {ppi_prior_df.shape}")
+print(f"PPI mode    : {ppi_prior_runtime_weight_mode}")
+print("[DL2-05] PASS")
+logger.info(
+    f"[M4] Priors loaded | motif={motif_prior_df.shape} | "
+    f"ppi={ppi_prior_df.shape} | ppi_mode={ppi_prior_runtime_weight_mode}"
+)
+logger.info("Stage M4 complete")
+
+
+# =============================================================================
+# STAGE M5: PER-LINEAGE SHARED PANDA + PER-TARGET LIONESS
+# =============================================================================
+
+print("\n" + "=" * 64)
+print("STAGE M5: PER-LINEAGE SHARED PANDA + PER-TARGET LIONESS")
+print("=" * 64)
+logger.info("Stage M5 start")
+
+from netZooPy.panda import Panda
+from netZooPy.lioness.lioness import Lioness
+
+QC_DIR = cfg.LAYER2_GRN_OUTPUT_DIR / cfg.L2_GRN_QC_PLOTS_DIR
+QC_DIR.mkdir(parents=True, exist_ok=True)
+
+lineage_summaries = {}
+completed_exports = []
+
+for lineage, models_od in lineage_groups.items():
+    target_ids = list(models_od.keys())
+    print("\n" + "-" * 64)
+    print(f"LINEAGE: {lineage}  |  targets: {len(target_ids)}")
+    print("-" * 64)
+    logger.info(f"[M5] === lineage={lineage} n={len(target_ids)} ===")
+
+    arts = foundation["lineage_artifacts"][lineage]
+
+    # ── Load frozen expression matrix ─────────────────────────
+    expr_parquet = cfg.LAYER2_GRN_OUTPUT_DIR / arts["expr_parquet"]
+    expr_cohort_full = pd.read_parquet(
+        expr_parquet, engine=cfg.FROZEN_EXPR_ENGINE
+    )
+    expr_cohort_full.index = pd.Index(
+        [str(x) for x in expr_cohort_full.index], name=cfg.COL_MODEL_ID
+    )
+    expr_cohort_full.columns = pd.Index(
+        [str(x) for x in expr_cohort_full.columns], name="Gene"
+    )
+    assert expr_cohort_full.index.is_unique, (
+        f"[M5/{lineage}] Duplicate sample IDs in frozen expr"
+    )
+    assert expr_cohort_full.columns.is_unique, (
+        f"[M5/{lineage}] Duplicate gene IDs in frozen expr"
+    )
+    assert not isinstance(expr_cohort_full.index, pd.MultiIndex), (
+        f"[M5/{lineage}] MultiIndex in frozen expr — 02A freeze may have failed"
+    )
+
+    # ── Load frozen sample order ──────────────────────────────
+    with open(
+        cfg.LAYER2_GRN_OUTPUT_DIR / arts["sample_order_json"], "r"
+    ) as fh:
+        sample_sidecar = json.load(fh)
+    frozen_sample_order = [str(x) for x in sample_sidecar["samples_in_order"]]
+    if list(expr_cohort_full.index) != frozen_sample_order:
+        raise RuntimeError(
+            f"[M5/{lineage}] Loaded parquet sample order does not match "
+            "frozen sample order sidecar."
+        )
+
+    # ── Load frozen gene list (zero-var post-QC) ─────────────
+    with open(
+        cfg.LAYER2_GRN_OUTPUT_DIR / arts["genes_post_qc_json"], "r"
+    ) as fh:
+        gene_info = json.load(fh)
+    genes_post_qc = gene_info["genes_post_qc_in_order"]
+    n_zero_var = gene_info["n_zero_var_genes"]
+    n_genes_post_qc = gene_info["n_genes_post_qc"]
+    assert len(genes_post_qc) == n_genes_post_qc, (
+        f"[M5/{lineage}] Gene list length inconsistency"
+    )
+
+    expr_cohort = expr_cohort_full[genes_post_qc].copy()
+    sample_order = [str(x) for x in expr_cohort.index]
+    gene_order = [str(x) for x in expr_cohort.columns]
+    n_cohort = len(sample_order)
+    n_genes = len(gene_order)
+
+    print(f"  Cohort size     : {n_cohort}")
+    print(f"  Genes (post-QC) : {n_genes}")
+    print(f"  Zero-var removed: {n_zero_var}")
+
+    # ── Partition present vs absent targets in frozen cohort ──
+    present_targets = []
+    for mid in target_ids:
+        if mid not in frozen_sample_order:
+            _handle_missing(
+                mid,
+                f"not present in frozen cohort for lineage '{lineage}'",
+                run_ledger,
+            )
+        else:
+            present_targets.append(mid)
+
+    if not present_targets:
+        print(f"  [!] No targets present in frozen cohort for {lineage}; skip lineage.")
+        lineage_summaries[lineage] = {
+            "status": "NO_TARGETS_PRESENT",
+            "n_requested": len(target_ids),
+            "n_present": 0,
+            "n_panda_builds": 0,
+        }
+        continue
+
+    # ── Output dirs ───────────────────────────────────────────
+    LIONESS_OUTPUT_DIR = (
+        cfg.LAYER2_GRN_OUTPUT_DIR
+        / cfg.L2_GRN_LIONESS_DIR.format(lineage=lineage)
+    )
+    LIONESS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ── Temp prior/expr files (shared for this lineage PANDA) ─
+    LIONESS_TMP = Path(tempfile.mkdtemp(prefix=f"l2b_multi_{lineage}_"))
+    logger.info(f"[M5/{lineage}] Temp dir: {LIONESS_TMP}")
+    expr_tmp = LIONESS_TMP / f"expr_{lineage}.txt"
+    motif_tmp = LIONESS_TMP / "motif_prior.txt"
+    ppi_tmp = LIONESS_TMP / "ppi_prior.txt"
+
+    expr_cohort.T.to_csv(expr_tmp, sep="\t", header=False, index=True)
+    motif_prior_df[["TF", "Gene", "Weight"]].to_csv(
+        motif_tmp, sep="\t", header=False, index=False
+    )
+    ppi_prior_df[["TF1", "TF2", "Weight"]].to_csv(
+        ppi_tmp, sep="\t", header=False, index=False
+    )
+
+    # ── Build ONE shared Panda for this lineage (DL2-25) ──────
+    print(
+        f"\n  Building SHARED Panda for {lineage} "
+        f"({n_cohort} samples, {len(present_targets)} LIONESS targets) ..."
+    )
+    logger.info(f"[M5/{lineage}] Building shared Panda")
+    t0_panda = time.time()
+    panda_obj = Panda(
+        expression_file=str(expr_tmp),
+        motif_file=str(motif_tmp),
+        ppi_file=str(ppi_tmp),
+        computing=cfg.PANDA_COMPUTING,
+        precision=cfg.PANDA_PRECISION,
+        save_memory=False,
+        save_tmp=True,
+        remove_missing=cfg.PANDA_REMOVE_MISSING,
+        keep_expression_matrix=True,
+        modeProcess=cfg.PANDA_MODE,
+        alpha=cfg.PANDA_ALPHA,
+        with_header=cfg.PANDA_WITH_HEADER,
+    )
+    panda_elapsed = time.time() - t0_panda
+    n_panda_builds = 1  # exactly one for this lineage
+
+    for req in [
+        "expression_matrix",
+        "motif_matrix",
+        "ppi_matrix",
+        "panda_network",
+        "export_panda_results",
+    ]:
+        if not hasattr(panda_obj, req):
+            raise RuntimeError(
+                f"[M5/{lineage}] Panda missing required attribute: {req}"
+            )
+
+    em_shape = tuple(panda_obj.expression_matrix.shape)
+    pn_shape = tuple(panda_obj.panda_network.shape)
+    ep_shape = tuple(panda_obj.export_panda_results.shape)
+    panda_internal_n_genes = em_shape[0]
+
+    if em_shape[1] != n_cohort:
+        raise RuntimeError(
+            f"[M5/{lineage}] Panda sample count {em_shape[1]} != cohort {n_cohort}"
+        )
+    if panda_internal_n_genes < n_genes:
+        raise RuntimeError(
+            f"[M5/{lineage}] Panda internal genes {panda_internal_n_genes} "
+            f"< input genes {n_genes} — unexpected for mode='{cfg.PANDA_MODE}'"
+        )
+    expected_edges = pn_shape[0] * pn_shape[1]
+    if ep_shape[0] != expected_edges:
+        raise RuntimeError(
+            f"[M5/{lineage}] export_panda_results rows {ep_shape[0]:,} "
+            f"!= expected edges {expected_edges:,}"
+        )
+
+    print(f"  Panda built     : {panda_elapsed:.1f} s")
+    print(f"  Input genes     : {n_genes}")
+    print(f"  Internal genes  : {panda_internal_n_genes}")
+    print(f"  Network shape   : {pn_shape}")
+    print(f"  Export shape    : {ep_shape}")
+
+    cfg.validate_deadlock_rules(
+        "dl2_09_lioness_after_panda",
+        lineage=lineage,
+        panda_converged=True,
+    )
+    cfg.validate_deadlock_rules(
+        "dl2_10_lioness_same_priors",
+        panda_motif_path=str(motif_tmp),
+        lioness_motif_path=str(motif_tmp),
+        panda_ppi_path=str(ppi_tmp),
+        lioness_ppi_path=str(ppi_tmp),
+    )
+    cfg.validate_deadlock_rules(
+        "dl2_25_shared_panda_per_lineage",
+        shared_panda_per_lineage=True,
+        cross_lineage_pooling=False,
+        n_panda_builds_for_lineage=n_panda_builds,
+    )
+    print("[DL2-09] PASS | [DL2-10] PASS | [DL2-25] PASS (shared PANDA)")
+
+    # ── Verify flatten order once for this shared PANDA (DL2-19/27) ──
+    ep = panda_obj.export_panda_results.copy()
+    ep_cols_lower = {str(c).lower(): c for c in ep.columns}
+    tf_col = ep_cols_lower.get("tf")
+    gene_col = ep_cols_lower.get("gene")
+    motif_col = ep_cols_lower.get("motif")
+    force_candidates = [
+        c
+        for c in ep.columns
+        if str(c).lower() in {"force", "weight", "score"}
+    ]
+    if not tf_col or not gene_col or len(force_candidates) != 1:
+        raise RuntimeError(
+            f"[M5/{lineage}] Cannot identify tf/gene/force columns in "
+            f"export_panda_results: {list(ep.columns)}"
+        )
+    force_col = force_candidates[0]
+
+    pn = panda_obj.panda_network
+    pn_vals = (
+        pn.to_numpy() if isinstance(pn, pd.DataFrame) else np.asarray(pn)
+    )
+    ep_force = pd.to_numeric(ep[force_col], errors="raise").to_numpy()
+    match_C = np.allclose(
+        ep_force,
+        pn_vals.reshape(-1, order="C"),
+        rtol=0,
+        atol=1e-12,
+        equal_nan=True,
+    )
+    match_F = np.allclose(
+        ep_force,
+        pn_vals.reshape(-1, order="F"),
+        rtol=0,
+        atol=1e-12,
+        equal_nan=True,
+    )
+    if match_C and not match_F:
+        verified_order = "C"
+    elif match_F and not match_C:
+        verified_order = "F"
+    elif match_C and match_F:
+        raise RuntimeError(
+            f"[M5/{lineage}] Both C and F flatten orders match — ambiguous."
+        )
+    else:
+        raise RuntimeError(
+            f"[M5/{lineage}] Neither C nor F flatten order matches PANDA export."
+        )
+
+    cfg.validate_deadlock_rules(
+        "dl2_19_export_only_if_verified", flatten_order_verified=True
+    )
+    cfg.validate_deadlock_rules(
+        "dl2_27_export_only_if_verified_multi", flatten_order_verified=True
+    )
+    print(f"  Verified order  : {verified_order}")
+    print("[DL2-19] PASS | [DL2-27] PASS")
+
+    lineage_completed = []
+    lineage_failed = []
+
+    # ── Per-target LIONESS on the SHARED panda_obj ────────────
+    for mid in present_targets:
+        meta = models_od[mid]
+        raw_input = meta["raw_input"]
+        target_pos_0based = sample_order.index(mid)
+        target_pos_1based = target_pos_0based + 1
+
+        print(
+            f"\n  → LIONESS {mid}  pos={target_pos_1based}/{n_cohort} "
+            f"(input={raw_input})"
+        )
+        logger.info(
+            f"[M5/{lineage}] Lioness start={target_pos_1based} "
+            f"end={target_pos_1based} model={mid}"
+        )
+
+        LIONESS_RAW_DIR = LIONESS_OUTPUT_DIR / cfg.L2B_NETZOOPY_RAW_DIR.format(
+            sample=mid
+        )
+        LIONESS_RAW_DIR.mkdir(parents=True, exist_ok=True)
+        # Integrity: purge stale netZooPy dumps from prior failed/partial runs
+        # so dual-write / leftover files cannot pollute shape-gated selection.
+        for _stale in LIONESS_RAW_DIR.glob("*"):
+            try:
+                if _stale.is_file():
+                    _stale.unlink()
+            except Exception as _se:
+                logger.warning(
+                    f"[M5/{lineage}/{mid}] could not remove stale {_stale.name}: {_se}"
+                )
+
+        # Sidecar (DL2-17)
+        sidecar_fname = cfg.L2B_TARGET_SAMPLE_ORDER_JSON.format(sample=mid)
+        sidecar_path = LIONESS_OUTPUT_DIR / sidecar_fname
+        sample_order_sidecar = {
+            "target_model_input": raw_input,
+            "target_model_id": mid,
+            "target_lineage": lineage,
+            "reference_cohort_policy": cfg.LIONESS_REFERENCE_POLICY,
+            "reference_cohort_size": n_cohort,
+            "n_genes_input_post_qc": n_genes,
+            "n_zero_var_removed": n_zero_var,
+            "zero_var_policy": cfg.ZERO_VARIANCE_GENE_POLICY,
+            "target_position_0based": target_pos_0based,
+            "target_position_1based": target_pos_1based,
+            "samples_in_order": sample_order,
+            "notebook": cfg.LAYER2_NOTEBOOK_02B_MULTI_NAME,
+            "run_mode": cfg.LAYER2_RUN_MODE,
+            "shared_panda_per_lineage": True,
+            "foundation_manifest": str(manifest_path),
+            "timestamp": datetime.now().isoformat(),
+        }
+        with open(sidecar_path, "w", encoding="utf-8") as fh:
+            json.dump(
+                sample_order_sidecar, fh, indent=2, ensure_ascii=False
+            )
+        cfg.validate_deadlock_rules(
+            "dl2_17_sample_order_deterministic", sidecar_written=True
+        )
+
+        t0_lioness = time.time()
+        lioness_exception = None
+        try:
+            try:
+                # ignore_final=True: do NOT call save_lioness_results() → no
+                # bare lioness.npy aggregate. save_single=True still writes the
+                # per-sample TF×gene matrix we need. netZooPy requires at least
+                # one of (save_single, not ignore_final) to be true.
+                # Scientific payload unchanged: LIONESS formula + shared PANDA.
+                lioness_obj = Lioness(
+                    obj=panda_obj,
+                    computing=cfg.PANDA_COMPUTING,
+                    precision=cfg.PANDA_PRECISION,
+                    ncores=1,
+                    start=target_pos_1based,
+                    end=target_pos_1based,
+                    subset_numbers=None,
+                    subset_names=None,
+                    save_dir=str(LIONESS_RAW_DIR),
+                    save_fmt="npy",
+                    output="network",
+                    alpha=cfg.PANDA_ALPHA,
+                    save_single=True,
+                    export_filename=None,
+                    ignore_final=True,
+                    online_coexpression=False,
+                )
+            except AttributeError as ae:
+                if "total_lioness_network" in str(ae):
+                    lioness_exception = ae
+                    logger.warning(
+                        f"[M5/{lineage}/{mid}] Known netZooPy 0.11.0 bug "
+                        f"caught after computation: {ae}. "
+                        "Raw .npy has been saved prior to this error."
+                    )
+                else:
+                    raise
+
+            lioness_elapsed = time.time() - t0_lioness
+
+            # ------------------------------------------------------------------
+            # Resolve raw .npy (netZooPy dual-write behavior)
+            # ------------------------------------------------------------------
+            # When save_single=True, Lioness writes:
+            #   lioness.{sample_name}.{i}.npy   ← single-sample TF×gene matrix
+            # When ignore_final=False (default), __init__ also calls
+            # save_lioness_results() which writes:
+            #   lioness.npy                     ← aggregate/export table
+            # So glob("*.npy") often returns 2 files. That is NOT a compute
+            # failure — only a wrong assumption in older Stage B6 code.
+            # Prefer the save_single pattern; fall back carefully.
+            # Ref: netZooPy/lioness/lioness.py (__lioness_loop + save_lioness_results)
+            # ------------------------------------------------------------------
+            npy_path = _resolve_lioness_npy(
+                raw_dir=LIONESS_RAW_DIR,
+                target_model_id=mid,
+                target_pos_0based=target_pos_0based,
+                expected_shape=tuple(pn_vals.shape),
+                context=f"M5/{lineage}/{mid}",
+            )
+            lioness_raw = np.load(str(npy_path))
+
+            if tuple(lioness_raw.shape) != tuple(pn_vals.shape):
+                raise RuntimeError(
+                    f"[M5/{lineage}/{mid}] LIONESS raw shape "
+                    f"{lioness_raw.shape} != PANDA network shape {pn_vals.shape} "
+                    f"(file={npy_path.name})"
+                )
+
+            # Label edges with verified flatten order
+            lioness_vec = lioness_raw.reshape(-1, order=verified_order)
+            if lioness_vec.size != len(ep):
+                raise RuntimeError(
+                    f"[M5/{lineage}/{mid}] Vector size {lioness_vec.size:,} "
+                    f"!= export rows {len(ep):,}"
+                )
+
+            lioness_df = pd.DataFrame(
+                {
+                    cfg.COL_GRN_SOURCE: ep[tf_col].astype(str).to_numpy(),
+                    cfg.COL_GRN_TARGET: ep[gene_col].astype(str).to_numpy(),
+                    cfg.COL_GRN_WEIGHT: lioness_vec.astype(float),
+                    "Motif": (
+                        ep[motif_col].to_numpy() if motif_col else np.nan
+                    ),
+                    "ModelID": mid,
+                    "Lineage": lineage,
+                }
+            )
+            assert not lioness_df.empty, (
+                f"[M5/{lineage}/{mid}] Extracted LIONESS DataFrame is empty"
+            )
+            assert {
+                cfg.COL_GRN_SOURCE,
+                cfg.COL_GRN_TARGET,
+                cfg.COL_GRN_WEIGHT,
+            }.issubset(lioness_df.columns)
+
+            final_lioness_tsv = LIONESS_OUTPUT_DIR / cfg.L2_GRN_LIONESS_TSV.format(
+                sample=mid
+            )
+            lioness_df.to_csv(final_lioness_tsv, sep="\t", index=False)
+
+            run_manifest_fname = cfg.L2B_LIONESS_RUN_MANIFEST_JSON.format(
+                sample=mid
+            )
+            run_manifest_path = LIONESS_OUTPUT_DIR / run_manifest_fname
+            run_manifest = {
+                "status": "COMPLETED_MULTI_TARGET",
+                "timestamp": datetime.now().isoformat(),
+                "notebook": cfg.LAYER2_NOTEBOOK_02B_MULTI_NAME,
+                "pipeline_version": PIPELINE_VERSION,
+                "config_version": CONFIG_VERSION,
+                "netzoopy_version": getattr(
+                    __import__("netZooPy"), "__version__", "unknown"
+                ),
+                "run_mode": cfg.LAYER2_RUN_MODE,
+                "shared_panda_per_lineage": True,
+                "n_panda_builds_for_lineage": n_panda_builds,
+                "target_model_input": raw_input,
+                "target_model_id": mid,
+                "target_lineage": lineage,
+                "reference_cohort_policy": cfg.LIONESS_REFERENCE_POLICY,
+                "reference_cohort_size": n_cohort,
+                "n_genes_input_post_qc": n_genes,
+                "n_genes_internal_union": panda_internal_n_genes,
+                "n_zero_var_removed": n_zero_var,
+                "zero_var_policy": cfg.ZERO_VARIANCE_GENE_POLICY,
+                "target_position_0based": target_pos_0based,
+                "target_position_1based": target_pos_1based,
+                "verified_flatten_order": verified_order,
+                "npy_flatten_order_policy": cfg.LIONESS_NPY_FLATTEN_ORDER,
+                "n_edges": len(lioness_df),
+                "panda_elapsed_sec": round(panda_elapsed, 1),
+                "lioness_elapsed_sec": round(lioness_elapsed, 1),
+                "raw_npy_file": str(npy_path),
+                "raw_npy_shape": list(lioness_raw.shape),
+                "final_tsv": str(final_lioness_tsv),
+                "sample_order_sidecar": str(sidecar_path),
+                "foundation_manifest": str(manifest_path),
+                "motif_prior_path": str(local_motif),
+                "ppi_prior_path": str(local_ppi),
+                "ppi_runtime_weight_mode": ppi_prior_runtime_weight_mode,
+                "snail_recomputed": False,
+                "snail_label_policy": cfg.SNAIL_LABEL_RESTORATION_POLICY,
+                "panda_mode": cfg.PANDA_MODE,
+                "panda_alpha": cfg.PANDA_ALPHA,
+                "panda_computing": cfg.PANDA_COMPUTING,
+                "panda_precision": cfg.PANDA_PRECISION,
+                "panda_union_expansion": cfg.PANDA_UNION_GENE_EXPANSION_EXPECTED,
+                "known_netzoopy_bug": (
+                    str(lioness_exception) if lioness_exception else None
+                ),
+                "deadlock_rules_checked": [
+                    "DL2-05",
+                    "DL2-09",
+                    "DL2-10",
+                    "DL2-14",
+                    "DL2-15",
+                    "DL2-17",
+                    "DL2-19",
+                    "DL2-22",
+                    "DL2-23",
+                    "DL2-24",
+                    "DL2-25",
+                    "DL2-26",
+                    "DL2-27",
+                    "DL2-28",
+                ],
+            }
+            with open(run_manifest_path, "w", encoding="utf-8") as fh:
+                json.dump(run_manifest, fh, indent=2, ensure_ascii=False)
+
+            entry = {
+                "model_id": mid,
+                "raw_input": raw_input,
+                "status": "COMPLETED",
+                "reason": "ok",
+                "lineage": lineage,
+                "target_position_1based": target_pos_1based,
+                "n_edges": len(lioness_df),
+                "verified_flatten_order": verified_order,
+                "panda_elapsed_sec": round(panda_elapsed, 1),
+                "lioness_elapsed_sec": round(lioness_elapsed, 1),
+                "final_tsv": str(final_lioness_tsv),
+                "run_manifest": str(run_manifest_path),
+                "raw_npy_file": str(npy_path),
+                "shared_panda": True,
+                "timestamp": datetime.now().isoformat(),
+            }
+            run_ledger.append(entry)
+            lineage_completed.append(mid)
+            completed_exports.append(entry)
+
+            print(
+                f"    edges={len(lioness_df):,}  "
+                f"lioness={lioness_elapsed:.1f}s  "
+                f"tsv={final_lioness_tsv.name}"
+            )
+            logger.info(
+                f"[M5/{lineage}/{mid}] COMPLETED edges={len(lioness_df):,} "
+                f"elapsed={lioness_elapsed:.1f}s"
+            )
+
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            logger.error(
+                f"[M5/{lineage}/{mid}] FAILED: {err}\n{traceback.format_exc()}"
+            )
+            run_ledger.append(
+                {
+                    "model_id": mid,
+                    "raw_input": raw_input,
+                    "status": "FAILED",
+                    "reason": err,
+                    "lineage": lineage,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+            lineage_failed.append(mid)
+            print(f"    [FAIL] {mid}: {err}")
+            if cfg.L2_MULTI_MODEL_ON_MISSING == "fail":
+                raise
+
+    # Lineage summary
+    lin_summary = {
+        "lineage": lineage,
+        "status": "COMPLETED",
+        "n_requested": len(target_ids),
+        "n_present_in_cohort": len(present_targets),
+        "n_completed": len(lineage_completed),
+        "n_failed": len(lineage_failed),
+        "completed_ids": lineage_completed,
+        "failed_ids": lineage_failed,
+        "n_panda_builds": n_panda_builds,
+        "shared_panda": True,
+        "reference_cohort_size": n_cohort,
+        "n_genes_input_post_qc": n_genes,
+        "n_genes_internal_union": panda_internal_n_genes,
+        "verified_flatten_order": verified_order,
+        "panda_elapsed_sec": round(panda_elapsed, 1),
+        "panda_network_shape": list(pn_shape),
+    }
+    lineage_summaries[lineage] = lin_summary
+    lin_summary_path = (
+        cfg.LAYER2_GRN_OUTPUT_DIR
+        / cfg.L2_MULTI_MODEL_LINEAGE_SUMMARY_JSON.format(lineage=lineage)
+    )
+    with open(lin_summary_path, "w", encoding="utf-8") as fh:
+        json.dump(lin_summary, fh, indent=2, ensure_ascii=False)
+    print(f"\n  Lineage summary → {lin_summary_path.name}")
+    logger.info(f"[M5/{lineage}] summary written: {lin_summary_path}")
+
+    # Cleanup temp
+    try:
+        shutil.rmtree(LIONESS_TMP)
+        logger.info(f"[M5/{lineage}] Temp cleaned: {LIONESS_TMP}")
+    except Exception as ce:
+        logger.warning(f"[M5/{lineage}] Could not clean temp dir: {ce}")
+
+    # Free large objects between lineages
+    del panda_obj, expr_cohort, expr_cohort_full, ep, pn_vals
+    try:
+        import gc
+
+        gc.collect()
+    except Exception:
+        pass
+
+logger.info("Stage M5 complete")
+
+
+# =============================================================================
+# STAGE M6: LEDGER + GATE REPORT + FINAL SUMMARY
+# =============================================================================
+
+print("\n" + "=" * 64)
+print("STAGE M6: LEDGER + GATE REPORT + FINAL SUMMARY")
+print("=" * 64)
+logger.info("Stage M6 start")
+
+NOTEBOOK_END_TIME = datetime.now()
+elapsed_total = (NOTEBOOK_END_TIME - NOTEBOOK_START_TIME).total_seconds()
+
+# DL2-28: every declared ID exactly once in ledger
+declared_ids = list(TARGET_MODELS_LIST)
+# Resolve declared list to ModelIDs (same as resolution)
+declared_resolved = [cfg.resolve_model_id(x) for x in declared_ids]
+ledger_ids = [e["model_id"] for e in run_ledger]
+
+# Detect silent drops
+missing_from_ledger = sorted(set(declared_resolved) - set(ledger_ids))
+extra_in_ledger = sorted(set(ledger_ids) - set(declared_resolved))
+no_silent = (len(missing_from_ledger) == 0) and (len(extra_in_ledger) == 0)
+
+if not no_silent:
+    # Attempt recovery note — still hard-fail DL2-28
+    logger.error(
+        f"[M6] Ledger integrity breach: missing={missing_from_ledger} "
+        f"extra={extra_in_ledger}"
+    )
+
+cfg.validate_deadlock_rules(
+    "dl2_28_full_ledger",
+    declared_ids=declared_resolved,
+    ledger_ids=ledger_ids,
+    no_silent_drops=no_silent,
+)
+print("[DL2-28] PASS — full ledger for every declared ModelID")
+
+# Status counts
+status_counts = defaultdict(int)
+for e in run_ledger:
+    status_counts[e["status"]] += 1
+
+print("\nRun ledger status counts:")
+for st, n in sorted(status_counts.items()):
+    print(f"  {st:<12}: {n}")
+
+# Write ledger JSON + TSV
+ledger_json_path = (
+    cfg.LAYER2_GRN_OUTPUT_DIR / cfg.L2_MULTI_MODEL_LEDGER_JSON
+)
+ledger_tsv_path = cfg.LAYER2_GRN_OUTPUT_DIR / cfg.L2_MULTI_MODEL_LEDGER_TSV
+
+ledger_doc = {
+    "pipeline_version": PIPELINE_VERSION,
+    "config_version": CONFIG_VERSION,
+    "notebook": cfg.LAYER2_NOTEBOOK_02B_MULTI_NAME,
+    "run_mode": cfg.LAYER2_RUN_MODE,
+    "declared_list_source": "cfg.L2_TARGET_MODELS_LIST",
+    "declared_n": len(declared_resolved),
+    "declared_ids": declared_resolved,
+    "missing_policy": cfg.L2_MULTI_MODEL_ON_MISSING,
+    "reference_policy": cfg.LIONESS_REFERENCE_POLICY,
+    "shared_panda_per_lineage": True,
+    "cross_lineage_pooling": False,
+    "status_counts": dict(status_counts),
+    "entries": run_ledger,
+    "timestamp_start": NOTEBOOK_START_TIME.isoformat(),
+    "timestamp_end": NOTEBOOK_END_TIME.isoformat(),
+    "elapsed_seconds": round(elapsed_total, 1),
+}
+with open(ledger_json_path, "w", encoding="utf-8") as fh:
+    json.dump(ledger_doc, fh, indent=2, ensure_ascii=False)
+
+pd.DataFrame(run_ledger).to_csv(ledger_tsv_path, sep="\t", index=False)
+print(f"\nLedger JSON : {ledger_json_path.name}")
+print(f"Ledger TSV  : {ledger_tsv_path.name}")
+
+# Gate report
+gate_report = {
+    "pipeline_version": PIPELINE_VERSION,
+    "config_version": CONFIG_VERSION,
+    "notebook": cfg.LAYER2_NOTEBOOK_02B_MULTI_NAME,
+    "foundation_notebook": cfg.LAYER2_NOTEBOOK_02A_NAME,
+    "foundation_manifest": str(manifest_path),
+    "log_file": str(cfg.LAYER2B_MULTI_LOG_FILE),
+    "timestamp_start": NOTEBOOK_START_TIME.isoformat(),
+    "timestamp_end": NOTEBOOK_END_TIME.isoformat(),
+    "elapsed_seconds": round(elapsed_total, 1),
+    "run_mode": cfg.LAYER2_RUN_MODE,
+    "declared_n": len(declared_resolved),
+    "status_counts": dict(status_counts),
+    "lineage_summaries": lineage_summaries,
+    "deadlock_rules": {
+        "DL2-05_prior_source": {"status": "PASS", "value": "LOCAL_FILES"},
+        "DL2-09_lioness_after_panda": {"status": "PASS"},
+        "DL2-10_lioness_same_priors": {"status": "PASS"},
+        "DL2-11_non_randomness": {"status": "NOT_RUN"},
+        "DL2-14_target_exists": {"status": "PASS_PER_RESOLVED"},
+        "DL2-15_lineage_from_metadata": {
+            "status": "PASS",
+            "source": "Model.csv",
+        },
+        "DL2-17_sample_order": {"status": "PASS_PER_TARGET"},
+        "DL2-19_flatten_verified": {"status": "PASS_PER_LINEAGE"},
+        "DL2-22_frozen_inputs_only": {
+            "status": "PASS",
+            "snail_recomputed": False,
+            "foundation_dir": str(cfg.L2A_FROZEN_INPUTS_DIR),
+        },
+        "DL2-23_split_provenance": {
+            "status": "PASS",
+            "log_multi": str(cfg.LAYER2B_MULTI_LOG_FILE),
+            "gate_report_multi": cfg.L2_MULTI_MODEL_GATE_REPORT_JSON,
+        },
+        "DL2-24_target_declared": {
+            "status": "PASS",
+            "source": "cfg.L2_TARGET_MODELS_LIST",
+            "n": len(declared_resolved),
+        },
+        "DL2-25_shared_panda_per_lineage": {
+            "status": "PASS",
+            "cross_lineage_pooling": False,
+            "policy": "one_panda_build_per_lineage",
+        },
+        "DL2-26_target_list_declared": {
+            "status": "PASS",
+            "source": "cfg.L2_TARGET_MODELS_LIST",
+        },
+        "DL2-27_export_only_if_verified_multi": {
+            "status": "PASS",
+        },
+        "DL2-28_full_ledger": {
+            "status": "PASS" if no_silent else "FAIL",
+            "ledger_json": str(ledger_json_path),
+            "ledger_tsv": str(ledger_tsv_path),
+        },
+    },
+    "prior_provenance": {
+        "motif_prior": str(local_motif),
+        "ppi_prior": str(local_ppi),
+        "ppi_runtime_weight_mode": ppi_prior_runtime_weight_mode,
+        "jaspar_version": cfg.PRIOR_JASPAR_VERSION,
+        "string_version": cfg.PRIOR_STRING_VERSION,
+        "prior_generated_date": cfg.PRIOR_GENERATED_DATE,
+        "hash_validated": True,
+    },
+    "outputs": {
+        "ledger_json": cfg.L2_MULTI_MODEL_LEDGER_JSON,
+        "ledger_tsv": cfg.L2_MULTI_MODEL_LEDGER_TSV,
+        "gate_report": cfg.L2_MULTI_MODEL_GATE_REPORT_JSON,
+        "completed_exports": [
+            {
+                "model_id": e["model_id"],
+                "lineage": e.get("lineage"),
+                "final_tsv": e.get("final_tsv"),
+                "n_edges": e.get("n_edges"),
+            }
+            for e in completed_exports
+        ],
+        "log_file": str(cfg.LAYER2B_MULTI_LOG_FILE),
+    },
 }
 
-stats_path = cfg.LAYER2B_OUTPUT_DIR / cfg.L2B_GRAPH_STATS_JSON
-with open(stats_path, 'w') as f:
-    json.dump(graph_stats, f, indent=2, default=lambda x: x.item() if isinstance(x, np.generic) else str(x))
+gr_path = cfg.LAYER2_GRN_OUTPUT_DIR / cfg.L2_MULTI_MODEL_GATE_REPORT_JSON
+with open(gr_path, "w", encoding="utf-8") as fh:
+    json.dump(gate_report, fh, indent=2, ensure_ascii=False)
 
-print(f"\nSaved graph statistics: {stats_path}")
-for key, value in graph_stats.items():
-    print(f"  {key}: {value}")
-# Save graph in GraphML format (optional - can be large)
-SAVE_GRAPHML = False  # Set to True to save full graph
+print(f"Gate report  : {gr_path.name}")
+logger.info(f"[M6] Gate report: {gr_path}")
 
-if SAVE_GRAPHML:
-    graphml_path = cfg.LAYER2B_OUTPUT_DIR / cfg.L2B_GRAPH_GRAPHML
-    nx.write_graphml(G, graphml_path)
-    print(f"\nSaved graph: {graphml_path}")
-else:
-    print("\nGraphML export skipped (SAVE_GRAPHML=False)")
-    print("  Set SAVE_GRAPHML=True to export full graph (may be large)")
+# Final summary
+print(f"\n{'=' * 80}")
+print("02B LIONESS MULTI-MODEL — COMPLETE (v2.4.0)")
+print(f"{'=' * 80}")
+print(f"  Declared targets : {len(declared_resolved)}")
+print(f"  COMPLETED        : {status_counts.get('COMPLETED', 0)}")
+print(f"  SKIPPED          : {status_counts.get('SKIPPED', 0)}")
+print(f"  FAILED           : {status_counts.get('FAILED', 0)}")
+print(f"  Lineages run     : {list(lineage_summaries.keys())}")
+print(f"  Shared PANDA     : True (per lineage)")
+print(f"  Cross-lineage    : False")
+print(f"  Total elapsed    : {elapsed_total:.1f} s")
+print(f"  Ledger           : {ledger_json_path}")
+print(f"  Gate report      : {gr_path}")
+print(f"  Log file         : {cfg.LAYER2B_MULTI_LOG_FILE}")
+print(f"  Outputs dir      : {cfg.LAYER2_GRN_OUTPUT_DIR}")
 
-## Pipeline Complete
+logger.info("=" * 80)
+logger.info("02B LIONESS MULTI-MODEL COMPLETE — v2.4.0")
+logger.info(
+    f"declared={len(declared_resolved)} "
+    f"completed={status_counts.get('COMPLETED', 0)} "
+    f"skipped={status_counts.get('SKIPPED', 0)} "
+    f"failed={status_counts.get('FAILED', 0)} "
+    f"elapsed={elapsed_total:.1f}s"
+)
+logger.info("=" * 80)
 
-# Summary of outputs and next steps.
-# ============================================================
-# Pipeline Complete
-# ============================================================
-PIPELINE_END = datetime.now()
-DURATION = PIPELINE_END - PIPELINE_START
-
-print("="*64)
-print("LAYER 2B PIPELINE COMPLETE")
-print("="*64)
-print(f"Started:  {PIPELINE_START.strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"Finished: {PIPELINE_END.strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"Duration: {DURATION}")
-
-print(f"\nOutput Directory: {cfg.LAYER2B_OUTPUT_DIR}")
-print("\nGenerated Files:")
-for f in sorted(cfg.LAYER2B_OUTPUT_DIR.glob("*")):
-    size_kb = f.stat().st_size / 1024
-    print(f"  {f.name} ({size_kb:.1f} KB)")
-
-print("\n" + "="*64)
-print("DEADLOCK COMPLIANCE STATUS")
-print("="*64)
-print("  DL6 (Directed GRN):     PASSED - SCENIC edges are directed (TF -> Target)")
-print("  DL7 (P0 Calibration):   PASSED - P0 = CNN_VS * Expression + epsilon")
-print("  DL8 (Delta Network):    PASSED - High-Affinity vs Low-Affinity comparison completed")
-
-print("\n" + "="*64)
-print("NEXT STEPS")
-print("="*64)
-print("1. Review Delta Network to identify drug-specific hub genes")
-print("2. Run Layer 3: CRISPR Dependency Validation (03_CRISPR_Validation.ipynb)")
-print("3. Functional enrichment analysis on top hub genes (GSEA, GO)")
-print("="*64)
+print("\n[DL2-11] Non-randomness test: NOT_RUN")
+logger.info("[DL2-11] NOT_RUN")
