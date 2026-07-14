@@ -484,19 +484,27 @@ L3_MULTIXRANK_REQUIRED_VERSION = "0.3"
 
 # graph_type encoding confirmed from MultiplexLayer source & official docs:
 """
+Code thật (commit 8738164) — chuẩn, https://github.com/anthbapt/multixrank/blob/873816443225851abbb5a02c5c66bb4c8d3e3bf6/multixrank/MultiplexLayer.py
+Python
 
-        Args:
-            abspath: str
-            existing absolute path
+# weighted?
+if self.graph_type[1] == '1':   # ← CHỮ SỐ THỨ HAI
+    # đọc 3 cột, weight = float64
 
-            graph_type: str
-            takes values 00=(unweighted, undirected), 01=(unweighted, directed),
-            10=(weighted, undirected), 11=(weighted, directed)
+# directed?
+if self.graph_type[0] == '1':   # ← CHỮ SỐ THỨ NHẤT
+    networkx_graph_obj = networkx.DiGraph()
+else:
+    networkx_graph_obj = networkx.Graph()
 
-            multiplex: str
-            Parent multiplex key
+Ý nghĩa là:
+Index	Ý nghĩa (CODE)
+graph_type[0]	directed? '0' = undirected, '1' = directed
+graph_type[1]	weighted? '0' = unweighted (2 cột), '1' = weighted (3 cột)
+
+Trong thiết kế code của MultiXrank, người ta thiết kế chữ số dầu tiên là có hướng/ vô hướng, còn chữ số sau biểu thị có trọng số/ không có trọng số
         """
-L3_GRAPH_TYPE_WEIGHTED_UNDIRECTED = "10"  # PPI
+L3_GRAPH_TYPE_WEIGHTED_UNDIRECTED = "01"  # PPI
 L3_GRAPH_TYPE_WEIGHTED_DIRECTED = "11"    # GRN
 L3_GRAPH_TYPE_UNWEIGHTED_UNDIRECTED = "00"  # bipartite gene-drug
 
